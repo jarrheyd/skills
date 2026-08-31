@@ -61,6 +61,12 @@ fi
 
 export PATH="$PATH:$HOME/.maestro/bin"
 command -v maestro >/dev/null || { echo "scout-run: maestro not on PATH. Install: curl -fsSL https://get.maestro.mobile.dev | bash" >&2; exit 1; }
+# A keg-only Homebrew openjdk is often installed but not on PATH; pick it up.
+if ! java -version >/dev/null 2>&1; then
+  for jdk in /opt/homebrew/opt/openjdk/bin /usr/local/opt/openjdk/bin; do
+    [ -x "$jdk/java" ] && export PATH="$jdk:$PATH" && break
+  done
+fi
 if ! java -version >/dev/null 2>&1; then
   echo "scout-run: no Java runtime; Maestro cannot start. Fix: brew install --cask temurin" >&2
   exit 1
