@@ -1,0 +1,7 @@
+# scout: generated e2e evidence never belongs in the repo (it lives in
+# ~/.scout/<project>/runs). These lines are a defensive net in case output is
+# ever pointed in-repo.
+.maestro/.report/
+.maestro/.report-state.json
+.maestro/.artifacts/
+.maestro/debug/

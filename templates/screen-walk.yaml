@@ -1,0 +1,40 @@
+# Screen-walk: the pre-ship health check. Opens every top-level screen and
+# after each asserts the app did NOT render an error state. This catches the
+# "screen renders its title but the content below failed to load" bug class
+# that title-visibility checks miss.
+#
+# Replace the assertNotVisible strings with YOUR app's literal error copy
+# (grep the source for the error-state components) and repeat the block after
+# every screen. Keep the walk shallow (top-level screens); deep drill-downs get
+# their own flows.
+#
+# Run:  maestro test .maestro/flows/screen-walk.yaml
+appId: com.example.acme.dev
+tags:
+  - smoke
+---
+- runFlow: _login.yaml
+
+# The reusable no-error check (your app's exact error strings):
+- assertNotVisible: "Something went wrong"
+- assertNotVisible: "We couldn't load this"
+- takeScreenshot: 01-home
+
+# ---- Screen 2 ----
+- tapOn:
+    id: "tab-two"
+- waitForAnimationToEnd:
+    timeout: 3000
+- assertNotVisible: "Something went wrong"
+- assertNotVisible: "We couldn't load this"
+- takeScreenshot: 02-screen-two
+
+# ---- A tab that may be absent (empty state variants): tap optionally ----
+- tapOn:
+    text: "Collections"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 3000
+- assertNotVisible: "Something went wrong"
+- assertNotVisible: "We couldn't load this"
+- takeScreenshot: 03-collections
