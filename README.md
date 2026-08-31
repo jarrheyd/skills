@@ -6,7 +6,7 @@ Maestro does the driving (simulator for mobile, Chrome for web). Plain scripts a
 
 ## What it does
 
-- `scout setup`: reads a project's code, generates flows + a screen-walk + a journey manifest, runs them until green, commits only the YAML
+- `scout setup`: reads a project's code, generates flows + a screen-walk + a journey manifest, runs them until green, commits only the YAML. `--blackbox` works from just a staging URL or an installable build when you have no codebase access
 - `scout run [tag]`: runs flows, builds the report
 - `scout crosscheck <sheet>`: verifies a QA test-script spreadsheet case by case against the live app (PASS / FAIL / SCRIPT WRONG / NOT WIRED / BLOCKED) and reviews the script itself
 - `scout audit [--changed] [--product]`: the pre-deploy gate: full run, coverage gap analysis, optional UX pass, ends in GREENLIGHT or NO-GO
