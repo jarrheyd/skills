@@ -1,4 +1,4 @@
-# scout
+# qa-review
 
 An e2e audit skill for AI coding agents. Plug it into any web or mobile project and it walks the app the way a user would, keeps screenshot evidence on your machine, and builds one skimmable HTML report you can greenlight a release from.
 
@@ -21,10 +21,10 @@ Maestro does the driving (simulator for mobile, Chrome for web). Plain scripts a
 ## Install
 
 ```bash
-git clone https://github.com/jarrheyd/scout ~/.claude/skills/scout
+git clone https://github.com/jarrheyd/qa-review ~/.claude/skills/qa-review
 ```
 
-Claude Code picks it up as `/scout`. For other agents, point them at `SKILL.md`; everything is plain markdown and scripts.
+Claude Code picks it up as `/qa-review` (the original name was scout; the internal names `scout.config.json`, `scout-run.sh`, `SCOUT_*` env vars, and the `~/.scout/` evidence root are kept so projects onboarded under the old name keep working). For other agents, point them at `SKILL.md`; everything is plain markdown and scripts.
 
 Prerequisites:
 

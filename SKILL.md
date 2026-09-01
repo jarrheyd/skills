@@ -1,13 +1,13 @@
 ---
-name: scout
-description: Maestro e2e audit skill for any web or mobile app. Walks the app screen per screen, captures evidence, and builds a skimmable local HTML report for QA and product review. Use when the user says "scout", wants to set up e2e flows, run a pre-deployment audit, cross-check a QA test script against the live app, review or author a test script, or wants screenshot proof that flows work before greenlighting a release.
+name: qa-review
+description: (alias "scout") Maestro e2e audit skill for any web or mobile app. Walks the app screen per screen, captures evidence, and builds a skimmable local HTML report for QA and product review. Use when the user says "scout", wants to set up e2e flows, run a pre-deployment audit, cross-check a QA test script against the live app, review or author a test script, or wants screenshot proof that flows work before greenlighting a release.
 version: 1.0.0
 user-invocable: true
 argument-hint: "[setup|run|crosscheck|audit|review] [target]"
 license: MIT
 ---
 
-# Scout
+# qa-review
 
 Drive the app the way a user would, keep the proof, and let a human greenlight from one report. Maestro runs the flows on a simulator (mobile) or Chrome (web); scripts assemble the evidence; the AI reads only a small summary. Works with any AI agent that can run shell commands.
 
