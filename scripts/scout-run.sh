@@ -145,7 +145,7 @@ if [ $SUITE_RC -ne 0 ] && [ "${SCOUT_NO_RETRY:-}" != "1" ]; then
   if [ -n "$FAILED" ]; then
     for flow in $FAILED; do
       set +e
-      run_maestro "$RUN_DIR/result-retry-${flow%.yaml}.xml" "flows/$flow"
+      run_maestro "$RUN_DIR/result-retry-${flow%.yaml}.xml" "flows/${flow%.yaml}.yaml"
       set -e
     done
   fi

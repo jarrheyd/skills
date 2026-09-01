@@ -17,6 +17,8 @@ Distilled from production Maestro suites that gate real releases. Follow these f
 ## Screenshots
 
 - Explicit `takeScreenshot: 01-name` at the moments that matter, numbered so the report orders them. Explicit captures beat Maestro's auto-captures: they are the journey's real moments, on purpose, in order.
+- Content before camera: every `takeScreenshot` is preceded by an `assertVisible` (or `extendedWaitUntil`) on REAL content of that screen - a post body, a name, a card title. Never shoot right after a tap or navigation: that frame is a skeleton loader, and skeletons in the report read as broken screens. Capture a loader only when the loading state itself is what the flow verifies, and name it so (`03-loading-state`).
+- A flow with zero `takeScreenshot` steps has no evidence of its own: the report falls back to Maestro's auto step-captures, which fire mid-load and mostly show skeletons. Every flow that lands in a report gets at least one explicit capture per screen it claims to verify.
 - Never capture a screen with a visible password. Shoot after submit.
 
 ## Error detection

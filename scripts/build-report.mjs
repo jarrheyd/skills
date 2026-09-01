@@ -43,6 +43,15 @@ const isWeb = (config.platform || 'mobile') === 'web';
 // earlier retained run.
 function runDirsUnder(dir) {
   if (!dir || !fs.existsSync(dir)) return [];
+  // Newer Maestro writes per-flow output under <debug>/.maestro/tests/<ts>/;
+  // treat each of those timestamp dirs as a run alongside the classic layout.
+  const nested = path.join(dir, '.maestro', 'tests');
+  if (fs.existsSync(nested)) {
+    return fs.readdirSync(nested)
+      .map((d) => path.join(nested, d))
+      .filter((d) => { try { return fs.statSync(d).isDirectory(); } catch { return false; } })
+      .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+  }
   const kids = fs.readdirSync(dir).map((d) => path.join(dir, d)).filter((d) => {
     try { return fs.statSync(d).isDirectory(); } catch { return false; }
   });
