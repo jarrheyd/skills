@@ -6,11 +6,11 @@ Maestro does the driving (simulator for mobile, Chrome for web). Plain scripts a
 
 ## What it does
 
-- `scout setup`: reads a project's code, generates flows + a screen-walk + a journey manifest, runs them until green, commits only the YAML. `--blackbox` works from just a staging URL or an installable build when you have no codebase access
-- `scout run [tag]`: runs flows, builds the report
-- `scout crosscheck <sheet>`: verifies a QA test-script spreadsheet case by case against the live app (PASS / FAIL / SCRIPT WRONG / NOT WIRED / BLOCKED) and reviews the script itself
-- `scout audit [--changed] [--product]`: the pre-deploy gate: full run, coverage gap analysis, optional UX pass, ends in GREENLIGHT or NO-GO
-- `scout review <script>`: reviews or writes a QA test script without driving the app
+- `qa-review setup`: reads a project's code, generates flows + a screen-walk + a journey manifest, runs them until green, commits only the YAML. `--blackbox` works from just a staging URL or an installable build when you have no codebase access
+- `qa-review run [tag]`: runs flows, builds the report
+- `qa-review crosscheck <sheet>`: verifies a QA test-script spreadsheet case by case against the live app (PASS / FAIL / SCRIPT WRONG / NOT WIRED / BLOCKED) and reviews the script itself
+- `qa-review audit [--changed] [--product]`: the pre-deploy gate: full run, coverage gap analysis, optional UX pass, ends in GREENLIGHT or NO-GO
+- `qa-review review <script>`: reviews or writes a QA test script without driving the app
 
 ## Where things go
 
@@ -24,7 +24,7 @@ Maestro does the driving (simulator for mobile, Chrome for web). Plain scripts a
 git clone https://github.com/jarrheyd/qa-review ~/.claude/skills/qa-review
 ```
 
-Claude Code picks it up as `/qa-review` (the original name was scout; the internal names `scout.config.json`, `scout-run.sh`, `SCOUT_*` env vars, and the `~/.scout/` evidence root are kept so projects onboarded under the old name keep working). For other agents, point them at `SKILL.md`; everything is plain markdown and scripts.
+Claude Code picks it up as `/qa-review`. Saying "scout" still triggers it: that was the original name, and the internal names stay put so projects onboarded under it keep working (`scout.config.json`, `scout-run.sh`, `SCOUT_*` env vars, the `~/.scout/` evidence root). For other agents, point them at `SKILL.md`; everything is plain markdown and scripts.
 
 Prerequisites:
 
@@ -40,9 +40,9 @@ Mobile projects also need Xcode with a simulator (or an Android emulator).
 ```bash
 cd your-app
 claude
-> /scout setup
+> /qa-review setup
 # answer the env questions, fill ~/.scout/<project>/.env with test creds
-> /scout audit
+> /qa-review audit
 # open the report, greenlight or not
 ```
 

@@ -1,4 +1,4 @@
-# scout review
+# qa-review review
 
 Review or author a QA test script WITHOUT driving the app. Desk mode: no runner, no simulator, no screenshots.
 

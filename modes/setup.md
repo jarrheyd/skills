@@ -1,6 +1,6 @@
-# scout setup
+# qa-review setup
 
-Bootstrap a project for scout. Code first: the app's source tells you the screens, routes, and selectors; ask the user only what code cannot answer. End state: a committed `.maestro/` with config, manifest, and green starter flows.
+Bootstrap a project for qa-review. Code first: the app's source tells you the screens, routes, and selectors; ask the user only what code cannot answer. End state: a committed `.maestro/` with config, manifest, and green starter flows.
 
 No codebase access (a tester with only a URL or a build)? Use `--blackbox`: skip steps 3 and parts of 5, follow the "Blackbox setup" section at the end instead. Everything else (prerequisites, config, .env, run-until-green) is identical.
 

@@ -361,7 +361,7 @@ const html = `<!doctype html>
     ${gapsSection()}
     ${productSection()}
   </main>
-  <footer>Built by scout. Each "last reviewed" date is the real day that journey last ran; screenshots are captured by the flows themselves.</footer>
+  <footer>Built by qa-review. Each "last reviewed" date is the real day that journey last ran; screenshots are captured by the flows themselves.</footer>
 </div>
 <script>
 (function () {

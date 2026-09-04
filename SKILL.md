@@ -15,11 +15,11 @@ Drive the app the way a user would, keep the proof, and let a human greenlight f
 
 | Invocation | Mode file | What it does |
 | --- | --- | --- |
-| `scout setup` | `modes/setup.md` | Bootstrap a project: generate flows, manifest, screen-walk from the code |
-| `scout run [tag]` | `modes/run.md` | Run flows (optionally one tag), build the report |
-| `scout crosscheck <sheet-or-file>` | `modes/crosscheck.md` | Verify a QA test script case by case against the live app |
-| `scout audit [--changed] [--product]` | `modes/audit.md` | Pre-deployment full audit + coverage gap analysis |
-| `scout review <script>` | `modes/review.md` | Review or author a QA test script without driving the app |
+| `qa-review setup` | `modes/setup.md` | Bootstrap a project: generate flows, manifest, screen-walk from the code |
+| `qa-review run [tag]` | `modes/run.md` | Run flows (optionally one tag), build the report |
+| `qa-review crosscheck <sheet-or-file>` | `modes/crosscheck.md` | Verify a QA test script case by case against the live app |
+| `qa-review audit [--changed] [--product]` | `modes/audit.md` | Pre-deployment full audit + coverage gap analysis |
+| `qa-review review <script>` | `modes/review.md` | Review or author a QA test script without driving the app |
 
 Read ONLY the mode file for the invoked mode. If no mode is named, ask which one, or infer it: a spreadsheet or test script link means crosscheck; "before we ship / deploy" means audit; a repo with no `.maestro/` means setup.
 

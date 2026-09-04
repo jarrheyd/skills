@@ -1,4 +1,4 @@
-# scout run
+# qa-review run
 
 Run flows and hand the human the report. The cheap, everyday mode.
 

@@ -1,4 +1,4 @@
-# scout audit
+# qa-review audit
 
 The pre-deployment gate: run everything, find what coverage misses, end with an explicit greenlight call. Flags: `--changed` (diff-scoped), `--product` (UX pass).
 

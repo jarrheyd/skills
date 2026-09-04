@@ -1,6 +1,6 @@
 # Product-pass rubric
 
-Used by `scout audit --product`. Input: one representative screenshot per screen (deduped from the run's captures; never review the same screen twice). Output: `product-notes.json` as `{ "findings": [{ "screen", "finding", "fix", "shot" }] }`. Only real findings; a clean screen produces no entry.
+Used by `qa-review audit --product`. Input: one representative screenshot per screen (deduped from the run's captures; never review the same screen twice). Output: `product-notes.json` as `{ "findings": [{ "screen", "finding", "fix", "shot" }] }`. Only real findings; a clean screen produces no entry.
 
 Check each screen against these, in order:
 

@@ -1,4 +1,4 @@
-# scout crosscheck
+# qa-review crosscheck
 
 Verify a QA test script case by case against the live app, then review the script itself. Verdicts and evidence rules: `references/verdicts.md`.
 
