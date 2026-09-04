@@ -13,7 +13,25 @@ const args = Object.fromEntries(
   process.argv.slice(2).reduce((a, v, i, arr) => (v.startsWith('--') ? [...a, [v.slice(2), arr[i + 1]]] : a), []),
 );
 if (!args.review || !fs.existsSync(args.review)) { console.error('build-review: --review <review.json> required'); process.exit(1); }
-const review = JSON.parse(fs.readFileSync(args.review, 'utf8'));
+let review;
+try { review = JSON.parse(fs.readFileSync(args.review, 'utf8')); } catch (e) { console.error(`build-review: ${args.review} is not valid JSON (${e.message})`); process.exit(1); }
+
+// Validate the shape phases/verdict.md promises. A wrong file must fail loudly,
+// never render as a quiet "aligned" or "needs a conversation".
+const VERDICTS = ['MATCHES', 'DRIFTED', 'MISSING', 'EXTRA', "CAN'T TELL"];
+const OVERALLS = ['ALIGNED', 'NEEDS A CONVERSATION'];
+const problems = [];
+if (!OVERALLS.includes(review.overall)) problems.push(`overall must be one of ${OVERALLS.join(' | ')}, got ${JSON.stringify(review.overall)}`);
+if (!Array.isArray(review.items)) problems.push('items must be an array');
+else review.items.forEach((it, i) => {
+  if (!it || typeof it !== 'object') { problems.push(`items[${i}] is not an object`); return; }
+  if (!it.expectation) problems.push(`items[${i}] has no expectation`);
+  if (!VERDICTS.includes(it.verdict)) problems.push(`items[${i}] verdict must be one of ${VERDICTS.join(' | ')}, got ${JSON.stringify(it.verdict)}`);
+  if (it.verdict !== 'MATCHES' && it.verdict !== 'EXTRA' && !it.note) problems.push(`items[${i}] (${it.verdict}) needs a note`);
+  if (['MATCHES', 'DRIFTED', 'MISSING'].includes(it.verdict) && !it.actual && !it.code) problems.push(`items[${i}] (${it.verdict}) cites no evidence: set actual (screenshot) or code (file:line)`);
+});
+for (const k of ['extras', 'bounds']) if (review[k] != null && !Array.isArray(review[k])) problems.push(`${k} must be an array of strings`);
+if (problems.length) { console.error(`build-review: ${args.review} is not a valid review:\n  - ${problems.join('\n  - ')}`); process.exit(1); }
 const baseDir = path.dirname(path.resolve(args.review));
 const outPath = args.out || path.join(baseDir, 'report.html');
 
@@ -44,7 +62,7 @@ const V = {
 };
 const counts = {};
 for (const it of review.items || []) counts[it.verdict] = (counts[it.verdict] || 0) + 1;
-const tally = Object.entries(counts).map(([v, n]) => `${n} ${v.toLowerCase()}`).join(' · ');
+const tally = Object.entries(counts).map(([v, n]) => `${n} ${v.toLowerCase()}`).join(', ');
 const aligned = review.overall === 'ALIGNED';
 
 function pair(it) {
@@ -83,8 +101,7 @@ const html = `<!doctype html>
   .page{max-width:760px;margin:0 auto;padding:56px 24px 96px}
   h1{font-size:30px;font-weight:700;letter-spacing:-0.02em;margin:0 0 6px}
   .target{color:var(--soft);font-size:15px;margin:0}
-  .call{margin:22px 0 8px;padding:14px 18px;border-radius:12px;font-weight:700;font-size:18px;
-    color:${aligned ? 'var(--ok)' : 'var(--bad)'};background:${aligned ? 'var(--okwash)' : 'var(--badwash)'}}
+  .call{margin:22px 0 8px;font-weight:700;font-size:20px;color:${aligned ? 'var(--ok)' : 'var(--bad)'}}
   .tally{color:var(--soft);font-size:14px;margin:0 0 8px}
   .agenda{margin:10px 0 0;padding:0 0 0 22px;color:var(--ink)}
   .agenda li{margin:4px 0}
@@ -94,12 +111,12 @@ const html = `<!doctype html>
   .item h3{font-size:19px;font-weight:700;letter-spacing:-0.01em;margin:0;flex:1}
   .item p{margin:8px 0 14px;color:var(--soft);font-size:16px;max-width:64ch}
   .code{color:var(--faint);font-size:13px}
-  .verdict{flex:none;font-weight:700;font-size:12.5px;padding:3px 10px;border-radius:999px;white-space:nowrap}
-  .verdict.v-match{color:var(--ok);background:var(--okwash)}
-  .verdict.v-drift{color:var(--amber);background:var(--amberwash)}
-  .verdict.v-miss{color:#fff;background:var(--bad)}
-  .verdict.v-extra{color:var(--gray);background:var(--graywash)}
-  .verdict.v-cant{color:var(--soft);background:var(--raise)}
+  .verdict{flex:none;font-weight:700;font-size:13px;white-space:nowrap}
+  .verdict.v-match{color:var(--ok)}
+  .verdict.v-drift{color:var(--amber)}
+  .verdict.v-miss{color:var(--bad)}
+  .verdict.v-extra{color:var(--gray)}
+  .verdict.v-cant{color:var(--soft)}
   .pair{display:flex;gap:16px;overflow-x:auto;padding:2px 2px 8px}
   .shot{flex:none;margin:0;max-width:46%}
   .shot figcaption{font-size:12.5px;color:var(--faint);margin:0 0 6px}
@@ -107,7 +124,6 @@ const html = `<!doctype html>
   .section{margin-top:44px;padding-top:12px;border-top:1px solid var(--line)}
   .section h2{font-size:22px;letter-spacing:-0.01em;margin:16px 0 8px}
   .section ul{margin:0;padding-left:22px;color:var(--soft)}
-  footer{margin-top:56px;padding-top:24px;border-top:1px solid var(--line);color:var(--faint);font-size:13.5px}
   @media (max-width:520px){.page{padding:44px 18px 72px}h1{font-size:25px}.shot{max-width:100%}}
 </style></head><body>
 <div class="page">
@@ -123,10 +139,9 @@ const html = `<!doctype html>
     ${review.extras?.length ? `<section class="section"><h2>Also noticed (outside what we agreed to check)</h2><ul>${review.extras.map((e) => `<li>${esc(e)}</li>`).join('')}</ul></section>` : ''}
     ${review.bounds?.length ? `<section class="section"><h2>What this review could not see</h2><ul>${review.bounds.map((b) => `<li>${esc(b)}</li>`).join('')}</ul></section>` : ''}
   </main>
-  <footer>Built by product-review. Each verdict compares what was built against the expectations you confirmed; pictures are the evidence.</footer>
 </div>
 </body></html>`;
 
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
 fs.writeFileSync(outPath, html);
-console.log(`Wrote ${outPath} (${(html.length / 1024 / 1024).toFixed(1)} MB) · ${review.items?.length || 0} expectations · ${review.overall}`);
+console.log(`Wrote ${outPath} (${(html.length / 1024 / 1024).toFixed(1)} MB), ${review.items.length} expectations, ${review.overall}`);

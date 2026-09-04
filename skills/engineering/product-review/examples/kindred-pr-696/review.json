@@ -1,0 +1,47 @@
+{
+  "feature": "Save for later reads as a control",
+  "target": "symphco/kindred PR #696 (fix/tap-affordances), code-only review of the merged diff",
+  "overall": "ALIGNED",
+  "items": [
+    {
+      "n": 1,
+      "expectation": "On a Life Story question, \"Save for later\" looks like a tappable control, not gray body text",
+      "verdict": "MATCHES",
+      "note": "The gray text is replaced by a heart icon and a semibold label in the primary brand color.",
+      "code": "apps/mobile/src/screens/LifeStoryChapterScreen/life-story-chapter.screen.tsx:606"
+    },
+    {
+      "n": 2,
+      "expectation": "The control shows a saved state that is visibly different from the unsaved state",
+      "verdict": "MATCHES",
+      "note": "Saved shows a filled heart, unsaved an outline heart.",
+      "code": "apps/mobile/src/screens/LifeStoryChapterScreen/life-story-chapter.screen.tsx:609"
+    },
+    {
+      "n": 3,
+      "expectation": "\"Share a recipe\" is sentence case everywhere it appears as a title",
+      "verdict": "MATCHES",
+      "note": "Both places that render the title changed: the create hub card and the recipe intro screen.",
+      "code": "apps/mobile/src/screens/CreateHubScreen/create-hub.screen.tsx:122, apps/mobile/src/screens/RecipeIntroScreen/recipe-intro.screen.tsx:96"
+    },
+    {
+      "n": 4,
+      "expectation": "The recipe import failure title is warm and plain, not a capitalized system message",
+      "verdict": "MATCHES",
+      "note": "\"Couldn't Read a Recipe\" became \"We couldn't read that recipe\", the wording confirmed in the intent model.",
+      "code": "apps/mobile/src/screens/RecipeImportScreen/recipe-import.screen.tsx:87"
+    },
+    {
+      "n": 5,
+      "expectation": "The save control does not crowd or overlap the question text on a small phone",
+      "verdict": "CAN'T TELL",
+      "note": "Layout needs a build on an iPhone SE-size simulator. The code adds a top margin and a row layout, which is a reasonable sign, but that is not evidence."
+    }
+  ],
+  "extras": [
+    "A larger touch area around the save control (8 points on every side). Not asked for; a good call that costs nothing, worth knowing about."
+  ],
+  "bounds": [
+    "code-only: reviewed from the merged diff, no build or simulator. Expectation 5 is the only visual one and stays CAN'T TELL until a build exists."
+  ]
+}
