@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
-Anti AI-Slop Copy Hook for Claude Code
+deslop copy hook.
 
-PreToolUse hook that validates prose content for AI writing patterns.
-Complements the design-system hook (which catches UI slop in .tsx/.jsx).
-This hook focuses on prose in .md, .mdx, .txt, .html, and string-heavy files.
+PreToolUse hook that blocks AI writing tells in prose (.md, .mdx, .txt, .html) and in
+the string literals of source files. Companion to design_slop_hook.py (visual tells).
 
 Exit codes:
-  0 = allow (no violations or non-prose file)
-  2 = block (banned phrase found)
+  0 = allow (clean, or not a prose file)
+  2 = block (at least one tell found; the reasons go to stderr)
 """
 
 import html
@@ -16,20 +15,6 @@ import json
 import os
 import re
 import sys
-from datetime import datetime
-
-DEBUG_LOG_FILE = "/tmp/anti-slop-hook-log.txt"
-
-
-def debug_log(message):
-    try:
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with open(DEBUG_LOG_FILE, "a") as f:
-            f.write(f"[{timestamp}] {message}\n")
-    except Exception:
-        pass
-
-
 # File patterns to check
 PROSE_EXTENSIONS = {".md", ".mdx", ".txt", ".html", ".htm"}
 
@@ -45,11 +30,10 @@ SKIP_PATTERNS = [
     "package-lock.json",
     "pnpm-lock.yaml",
     "yarn.lock",
-    # Don't check the skill's own reference files
+    # The skill's pattern catalogs and the hooks quote the tells on purpose.
+    # SKILL.md and README.md are NOT exempt: they must pass the gate they describe.
     "deslop/references/",
-    "deslop/SKILL.md",
     "deslop/hooks/",
-    "deslop/README.md",
     # Don't check design system references
     "design-system/references/",
     "brand-system/references/",
@@ -71,46 +55,46 @@ if _extra_skips:
 
 BANNED_PHRASES = [
     # Opening/transition fluff
-    (r"(?i)in\s+today'?s\s+fast[- ]paced", "banned phrase: 'in today's fast-paced...' — skip the throat-clearing, start with your point"),
-    (r"(?i)in\s+the\s+ever[- ]evolving\s+landscape", "banned phrase: 'in the ever-evolving landscape' — empty opener"),
-    (r"(?i)in\s+an?\s+era\s+where", "banned phrase: 'in an era where' — skip the preamble"),
-    (r"(?i)without\s+further\s+ado", "banned phrase: 'without further ado' — just say the thing"),
+    (r"(?i)in\s+today'?s\s+fast[- ]paced", "banned phrase: 'in today's fast-paced...' - skip the throat-clearing, start with your point"),
+    (r"(?i)in\s+the\s+ever[- ]evolving\s+landscape", "banned phrase: 'in the ever-evolving landscape' - empty opener"),
+    (r"(?i)in\s+an?\s+era\s+where", "banned phrase: 'in an era where' - skip the preamble"),
+    (r"(?i)without\s+further\s+ado", "banned phrase: 'without further ado' - just say the thing"),
 
     # The "Not X, but Y" family
-    (r"(?i)(?:it'?s|this\s+is)\s+not\s+just\s+\w+[^.]{0,40}\.\s*(?:it'?s|this\s+is)\s+", "banned pattern: 'It's not just X. It's Y.' — the #1 AI tell. Rewrite as a direct statement"),
-    (r"(?i)not\s+just\s+about\s+\w+[^—]*\s*—\s*it'?s\s+about", "banned pattern: 'not just about X — it's about Y' — AI reframe structure"),
+    (r"(?i)(?:it'?s|this\s+is)\s+not\s+just\s+\w+[^.]{0,40}\.\s*(?:it'?s|this\s+is)\s+", "banned pattern: 'It's not just X. It's Y.' - the #1 AI tell. Rewrite as a direct statement"),
+    (r"(?i)not\s+just\s+about\s+\w+[^-]*\s*-\s*it'?s\s+about", "banned pattern: 'not just about X - it's about Y' - AI reframe structure"),
 
     # Aspirational fluff
-    (r"(?i)unlock\s+the\s+(?:power|potential)\s+of", "banned phrase: 'unlock the power/potential of' — say what it does"),
-    (r"(?i)elevate\s+your\s+(?:workflow|experience|game|strategy)", "banned phrase: 'elevate your...' — be specific"),
-    (r"(?i)revolutionize\s+the\s+way\s+you", "banned phrase: 'revolutionize the way you' — show, don't tell"),
-    (r"(?i)seamlessly\s+integrat", "banned phrase: 'seamlessly integrate' — describe the integration"),
-    (r"(?i)harness\s+the\s+power\s+of", "banned phrase: 'harness the power of' — be direct"),
-    (r"(?i)take\s+(?:your|it)\s+to\s+the\s+next\s+level", "banned phrase: 'take it to the next level' — what level?"),
-    (r"(?i)reimagine\s+what'?s\s+possible", "banned phrase: 'reimagine what's possible' — say what's actually possible"),
+    (r"(?i)unlock\s+the\s+(?:power|potential)\s+of", "banned phrase: 'unlock the power/potential of' - say what it does"),
+    (r"(?i)elevate\s+your\s+(?:workflow|experience|game|strategy)", "banned phrase: 'elevate your...' - be specific"),
+    (r"(?i)revolutionize\s+the\s+way\s+you", "banned phrase: 'revolutionize the way you' - show, don't tell"),
+    (r"(?i)seamlessly\s+integrat", "banned phrase: 'seamlessly integrate' - describe the integration"),
+    (r"(?i)harness\s+the\s+power\s+of", "banned phrase: 'harness the power of' - be direct"),
+    (r"(?i)take\s+(?:your|it)\s+to\s+the\s+next\s+level", "banned phrase: 'take it to the next level' - what level?"),
+    (r"(?i)reimagine\s+what'?s\s+possible", "banned phrase: 'reimagine what's possible' - say what's actually possible"),
 
     # Redundant verbs (AI padding)
-    (r"(?i)\bserves\s+as\b", "banned phrase: 'serves as' — just say 'is'"),
+    (r"(?i)\bserves\s+as\b", "banned phrase: 'serves as' - just say 'is'"),
 
     # Banned words (flagged in live corrections)
     (r"(?i)\bwhack[- ]?a[- ]?mole\b", "banned: 'whack-a-mole' -- plain it out (e.g. 'each fix caused the next problem')"),
 
     # Sycophantic
-    (r"(?i)^great\s+question!", "banned phrase: 'Great question!' — just answer it"),
-    (r"(?i)^absolutely!", "banned phrase: 'Absolutely!' — forced enthusiasm"),
-    (r"(?i)that'?s\s+a\s+(?:great|fantastic|excellent)\s+(?:point|question|observation)", "banned phrase: sycophantic acknowledgment — answer directly"),
+    (r"(?i)^great\s+question!", "banned phrase: 'Great question!' - just answer it"),
+    (r"(?i)^absolutely!", "banned phrase: 'Absolutely!' - forced enthusiasm"),
+    (r"(?i)that'?s\s+a\s+(?:great|fantastic|excellent)\s+(?:point|question|observation)", "banned phrase: sycophantic acknowledgment - answer directly"),
 
     # Filler closers
-    (r"(?i)(?:^|\.\s+)let\s+that\s+sink\s+in\.?$", "banned phrase: 'Let that sink in.' — trust the reader"),
-    (r"(?i)(?:^|\.\s+)read\s+that\s+again\.?$", "banned phrase: 'Read that again.' — LinkedIn filler"),
+    (r"(?i)(?:^|\.\s+)let\s+that\s+sink\s+in\.?$", "banned phrase: 'Let that sink in.' - trust the reader"),
+    (r"(?i)(?:^|\.\s+)read\s+that\s+again\.?$", "banned phrase: 'Read that again.' - LinkedIn filler"),
 
     # Vague attributions (from unslop merge, 2026-08-18) — a claim with no real source is slop
-    (r"(?i)\bstudies\s+show\b", "vague attribution: 'studies show' — cite the actual study or drop the claim"),
-    (r"(?i)\bresearch(?:ers)?\s+(?:show|shows|suggest|suggests|indicate|indicates|have\s+found)\b", "vague attribution: 'research shows' — name the source or cut it"),
-    (r"(?i)\bexperts?\s+(?:say|agree|believe|recommend)\b", "vague attribution: 'experts say' — who, specifically?"),
-    (r"(?i)\bit\s+is\s+widely\s+(?:known|believed|accepted|regarded|understood)\b", "vague attribution: 'it is widely known' — by whom? say it plainly or cut"),
-    (r"(?i)\b(?:many|most)\s+(?:believe|argue|would\s+agree)\b", "vague attribution: 'many believe' — name who, or state it as your own view"),
-    (r"(?i)\bcritics\s+(?:argue|say|claim)\b", "vague attribution: 'critics argue' — which critics?"),
+    (r"(?i)\bstudies\s+show\b", "vague attribution: 'studies show' - cite the actual study or drop the claim"),
+    (r"(?i)\bresearch(?:ers)?\s+(?:show|shows|suggest|suggests|indicate|indicates|have\s+found)\b", "vague attribution: 'research shows' - name the source or cut it"),
+    (r"(?i)\bexperts?\s+(?:say|agree|believe|recommend)\b", "vague attribution: 'experts say' - who, specifically?"),
+    (r"(?i)\bit\s+is\s+widely\s+(?:known|believed|accepted|regarded|understood)\b", "vague attribution: 'it is widely known' - by whom? say it plainly or cut"),
+    (r"(?i)\b(?:many|most)\s+(?:believe|argue|would\s+agree)\b", "vague attribution: 'many believe' - name who, or state it as your own view"),
+    (r"(?i)\bcritics\s+(?:argue|say|claim)\b", "vague attribution: 'critics argue' - which critics?"),
 
     # AI tool-remnant markers - literal ChatGPT/Gemini leakage, never acceptable (Wikipedia signs-of-AI, 2026-08-27)
     (r":?contentReference\[", "AI tool remnant: 'contentReference[' - ChatGPT artifact, delete it"),
@@ -139,6 +123,15 @@ BANNED_PHRASES = [
     (r"(?i)\bat\s+the\s+end\s+of\s+the\s+day\b", "filler: 'at the end of the day' - cut it, state the point"),
     (r"(?i)\bthe\s+name\s+of\s+the\s+game\b", "cliche: 'the name of the game' - say the actual priority"),
     (r"(?i)\bwhen\s+it\s+comes\s+to\b", "filler opener: 'when it comes to' - start with the point"),
+
+    # Manufactured-candor openers and TikTok aphorisms
+    (r"(?i)^(?:honestly|genuinely)[,?]", "manufactured candor: 'Honestly,' / 'Genuinely,' as an opener - cut it, the sentence stands on its own"),
+    (r"(?i)^(?:real\s+talk|i'?ll\s+be\s+honest|here'?s\s+the\s+truth|let\s+me\s+be\s+real)\b", "manufactured candor: 'Real talk' / 'I'll be honest' - cut the opener"),
+    (r"(?i)\bhits?\s+different\b", "aphorism: 'hits different' - say what is different"),
+    (r"(?i)\b\w+,?\s+but\s+make\s+it\s+\w+", "aphorism: 'X but make it Y' - describe the actual thing"),
+    (r"(?i)\b(?:iykyk|if\s+you\s+know,?\s+you\s+know)\b", "aphorism: 'iykyk' - say it or cut it"),
+    (r"(?i)\bit\s+came\s+back\s+(?:null|empty|surprising|clean|exactly)\b", "passive result rhythm: 'it came back X' - name what was found"),
+    (r"(?i)\boperationali[sz]", "tech-bro abstraction: 'operationalize' - say what will actually be done"),
 ]
 
 # ============================================================
@@ -171,7 +164,6 @@ TIER2_THRESHOLD = 2  # per 500 words
 # ============================================================
 
 EM_DASH = "—"
-EM_DASH_MAX_PER_300_WORDS = 1
 
 FILLER_TRANSITIONS = [
     r"(?i)^furthermore[,.]",
@@ -266,7 +258,7 @@ STOPWORDS = {
 }
 
 # WARN: wordy phrases, false ranges, AI disclaimers (from unslop merge, 2026-08-18).
-# Warnings, not blocks — these are context-dependent (a real range or a genuine "because" is fine).
+# Warnings, not blocks - these are context-dependent (a real range or a genuine "because" is fine).
 WEAK_PHRASES = [
     (r"(?i)\bdue\s+to\s+the\s+fact\s+that\b", "wordy: 'due to the fact that' -> 'because'"),
     (r"(?i)\bin\s+order\s+to\b", "wordy: 'in order to' -> 'to'"),
@@ -325,8 +317,8 @@ def check_banned_phrases(content):
     lines = content.split("\n")
 
     for i, line in enumerate(lines, 1):
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or stripped.startswith("<!--"):
+        stripped = re.sub(r"^#{1,6}\s+", "", line.strip())
+        if not stripped or stripped.startswith("<!--"):
             continue
 
         for pattern, msg in BANNED_PHRASES:
@@ -352,31 +344,15 @@ def check_word_density(content):
     for word in TIER1_WORDS:
         count = sum(1 for w in words if w.strip(".,;:!?\"'()") == word)
         if count > TIER1_THRESHOLD * blocks_of_500:
-            warnings.append(f"[DENSITY] '{word}' appears {count}x in {word_count} words — strong AI signal (Tier 1)")
+            warnings.append(f"[DENSITY] '{word}' appears {count}x in {word_count} words - strong AI signal (Tier 1)")
 
     # Tier 2
     for word in TIER2_WORDS:
         count = sum(1 for w in words if w.strip(".,;:!?\"'()") == word)
         if count > TIER2_THRESHOLD * blocks_of_500:
-            warnings.append(f"[DENSITY] '{word}' appears {count}x in {word_count} words — moderate AI signal (Tier 2)")
+            warnings.append(f"[DENSITY] '{word}' appears {count}x in {word_count} words - moderate AI signal (Tier 2)")
 
     return warnings
-
-
-def check_em_dash_density(content):
-    """Check for excessive em dash usage."""
-    words = content.split()
-    word_count = len(words)
-    em_dash_count = content.count(EM_DASH)
-
-    if word_count < 50:
-        return []
-
-    blocks_of_300 = max(1, word_count / 300)
-    if em_dash_count > EM_DASH_MAX_PER_300_WORDS * blocks_of_300:
-        return [f"[STRUCTURE] {em_dash_count} em dashes in {word_count} words — max {EM_DASH_MAX_PER_300_WORDS} per 300 words. Use commas or periods instead."]
-
-    return []
 
 
 def check_filler_transitions(content):
@@ -388,42 +364,10 @@ def check_filler_transitions(content):
         stripped = line.strip()
         for pattern in FILLER_TRANSITIONS:
             if re.search(pattern, stripped):
-                warnings.append((i, f"[FILLER] Line starts with AI filler transition — cut it and start with the point"))
+                warnings.append((i, f"[FILLER] Line starts with AI filler transition - cut it and start with the point"))
                 break
 
     return warnings
-
-
-def check_paragraph_uniformity(content):
-    """Check if paragraphs are suspiciously uniform in length."""
-    # Split into paragraphs (double newline separated)
-    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", content) if p.strip()]
-    # Filter to actual prose paragraphs (not headings, lists, code blocks)
-    prose_paragraphs = [
-        p for p in paragraphs
-        if not p.startswith("#")
-        and not p.startswith("-")
-        and not p.startswith("*")
-        and not p.startswith("`")
-        and not p.startswith("|")
-        and len(p.split()) > 10
-    ]
-
-    if len(prose_paragraphs) < 4:  # need enough paragraphs to judge
-        return []
-
-    word_counts = [len(p.split()) for p in prose_paragraphs]
-    avg = sum(word_counts) / len(word_counts)
-
-    if avg == 0:
-        return []
-
-    # Check if all are within 15% of average
-    within_range = sum(1 for c in word_counts if abs(c - avg) / avg < 0.15)
-    if within_range >= len(word_counts) * 0.8:  # 80%+ paragraphs are uniform
-        return [f"[STRUCTURE] {within_range}/{len(word_counts)} paragraphs are within 15% of {int(avg)} words — AI-level uniformity. Vary paragraph length for human rhythm."]
-
-    return []
 
 
 def check_weak_phrases(content):
@@ -445,7 +389,7 @@ def check_curly_quotes(content):
     violations = []
     for i, line in enumerate(content.split("\n"), 1):
         if any(c in line for c in CURLY_QUOTES):
-            violations.append((i, "[BLOCK] curly/smart quotes — use straight ASCII quotes (\" and ')"))
+            violations.append((i, "[BLOCK] curly/smart quotes - use straight ASCII quotes (\" and ')"))
     return violations
 
 
@@ -460,14 +404,14 @@ def check_title_case_headings(content):
         for w in words[1:]:  # skip the first word (sentence case caps it too)
             core = re.sub(r"[^A-Za-z]", "", w)
             if core.lower() in TITLE_CASE_SMALL and core[:1].isupper():
-                violations.append((i, "[BLOCK] Title Case heading — use sentence case (capitalize only the first word + proper nouns)"))
+                violations.append((i, "[BLOCK] Title Case heading - use sentence case (capitalize only the first word + proper nouns)"))
                 break
     return violations
 
 
 def check_bold_overuse(content):
     """BLOCK: bold peppered through a flowing prose paragraph (decoration, not emphasis).
-    Skips label-led lines (starting with ** or a list/heading/table marker) — those are legit style."""
+    Skips label-led lines (starting with ** or a list/heading/table marker) - those are legit style."""
     violations = []
     for para in re.split(r"\n\s*\n", content):
         p = para.strip()
@@ -476,7 +420,7 @@ def check_bold_overuse(content):
         bolds = len(re.findall(r"\*\*[^*\n]+\*\*", p))
         sentences = len(re.findall(r"[.!?](?:\s|$)", p))
         if bolds >= 4 and sentences >= 2 and len(p.split()) >= 40:
-            violations.append((0, f"[BLOCK] bold overused ({bolds} bold spans in one prose paragraph) — bold is for rare emphasis, not decoration"))
+            violations.append((0, f"[BLOCK] bold overused ({bolds} bold spans in one prose paragraph) - bold is for rare emphasis, not decoration"))
     return violations
 
 
@@ -508,6 +452,27 @@ def check_middot_separator(content):
     for i, line in enumerate(content.split("\n"), 1):
         if re.search(r"\s·\s", line):
             violations.append((i, "[BLOCK] ' · ' middot separator - an AI tell; use a word, comma, or separate line"))
+    return violations
+
+
+def check_structural_tics(content):
+    """BLOCK: rhythm-level tells that need more than a phrase match."""
+    violations = []
+    checks = [
+        (r"\?\s+[A-Z][^?\n]{0,30}\?\s+[A-Z][^?\n]{0,30}\?", "rhetorical-question pile-up (three short questions, no answer) - answer one or cut them"),
+        (r"\bNot\s+[^.\n]{1,30}\.\s+Not\s+[^.\n]{1,30}\.", "'Not X. Not Y.' negation ladder - state the actual figure or fact"),
+        (r"(?i)^either\s+[^.\n]{3,60}\s+or\s+[^.\n]{3,60}\.\s*$", "either-or reductive framing - name the real options, or drop the frame"),
+        (r"\bthe-\w+(?:-\w+){2,}\b", "hyphenated-compound title ('the-thing-that-broke story') - write the phrase out"),
+        (r"(?i)\b(\w{4,}(?:ly|ive|ful|ous|al|ic|ate|ent)),\s+(\w{4,}(?:ly|ive|ful|ous|al|ic|ate|ent)),\s+(?:and\s+)?(\w{4,}(?:ly|ive|ful|ous|al|ic|ate|ent))\b[.!]", "triple-adjective cadence ('specific, careful, deliberate.') - keep the one that carries the point"),
+    ]
+    for i, line in enumerate(content.split("\n"), 1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith(("<!--", "```", "|")):
+            continue
+        for pattern, msg in checks:
+            if re.search(pattern, stripped):
+                violations.append((i, f"[BLOCK] {msg}"))
+                break
     return violations
 
 
@@ -700,11 +665,11 @@ def main():
     middot = check_middot_separator(content)
     explainer = check_explainer_headings(content)
     restate = check_restatement(content)
-    # EVERYTHING BLOCKS (2026-08-27: "everything should just block, no need for warn"). The former
-    # warn tier (density, em dash, filler transitions, weak copulas / -ing tails / wordy / false ranges) is now
-    # blocking. Two deliberate calls: (1) the paragraph-uniformity heuristic is DROPPED, not promoted - blocking
-    # a write because "paragraphs are similar length" false-positives on every structured doc. (2) em dashes now
-    # block on ANY occurrence (he bans them outright), not just past a density threshold.
+    tics = check_structural_tics(content)
+    # Everything blocks; there is no warn tier. Density, filler transitions, weak copulas,
+    # -ing tails, wordy phrases and false ranges all block. Em dashes block on any occurrence.
+    # Paragraph-length uniformity is deliberately not checked: it false-positives on every
+    # structured document.
     density_blocks = [(0, w) for w in check_word_density(content)]
     filler_blocks = [(w[0], w[1]) if isinstance(w, tuple) else (0, w) for w in check_filler_transitions(content)]
     weak_blocks = check_weak_phrases(content)
@@ -713,20 +678,18 @@ def main():
         emdash_blocks = [(0, f"[BLOCK] em dash present ({content.count(EM_DASH)}x) - banned outright; use a hyphen, comma, or period")]
 
     all_blocks = (banned + curly + titlecase + bold + boldlead + middot + explainer
-                  + restate + weak_blocks + density_blocks + emdash_blocks + filler_blocks)
+                  + restate + tics + weak_blocks + density_blocks + emdash_blocks + filler_blocks)
 
     if all_blocks:
-        parts = [f"AI Slop BLOCKED — {len(all_blocks)} pattern(s) in {os.path.basename(file_path)}:\n"]
+        parts = [f"AI Slop BLOCKED: {len(all_blocks)} pattern(s) in {os.path.basename(file_path)}:\n"]
         for line_num, msg in all_blocks[:8]:
             parts.append(f"  Line ~{line_num}: {msg}")
         if len(all_blocks) > 8:
             parts.append(f"\n  ... and {len(all_blocks) - 8} more.")
-        parts.append("\nRewrite without these AI patterns. See: ~/.claude/skills/deslop/references/copy-slop-dictionary.md")
-        debug_log(f"BLOCKED: {file_path} — {len(all_blocks)} patterns")
+        parts.append(f"\nRewrite without these AI patterns. See: {os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'references', 'copy-slop-dictionary.md')}")
         print("\n".join(parts), file=sys.stderr)
         sys.exit(2)
 
-    debug_log(f"PASSED: {file_path}")
     sys.exit(0)
 
 

@@ -1,15 +1,18 @@
 {
-  "description": "Anti AI-slop enforcement — validates prose content for AI writing patterns",
+  "description": "deslop gate for a standalone install of this skill as a plugin. The monorepo's root hooks/hooks.json is the shipped copy.",
   "hooks": {
     "PreToolUse": [
       {
         "matcher": "Write|Edit|MultiEdit",
         "hooks": [
-          {
-            "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/copy_slop_hook.py",
-            "timeout": 5
-          }
+          { "type": "command", "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/copy_slop_hook.py", "timeout": 5 },
+          { "type": "command", "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/design_slop_hook.py", "timeout": 5 }
+        ]
+      },
+      {
+        "matcher": "Artifact|mcp__.*__create_file|mcp__.*__update_file",
+        "hooks": [
+          { "type": "command", "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/artifact_slop_hook.py", "timeout": 10 }
         ]
       }
     ]

@@ -315,10 +315,10 @@ These need a reader, not a regex. The review gate and slop-detector agent apply 
 
 Ported from the Cursor "unslop" skill. The first four are enforced by the hook; the last two need human judgment.
 
-- Weak copulas. "serves as", "stands as", "boasts", "features a". Say what it is or does: "is", "runs", "handles", "has". (hook: warn)
-- Empty -ing tails. A trailing participle that adds nothing: ", highlighting the...", ", ensuring...", ", reflecting...", ", underscoring...". Cut it, or start a new sentence with the concrete point. (hook: warn)
-- False ranges. "from X to Y" or "everything from X to Y" for two things that aren't a real spectrum. List the actual items or cut. (hook: warn)
-- Abstract jargon-as-technical. "substrate", "nexus", "paradigm", "flywheel", "north star", "vector" (when non-technical). Name the concrete thing. (hook: warn; "vector" is judgment-only, legit in math/security)
+- Weak copulas. "serves as", "stands as", "boasts", "features a". Say what it is or does: "is", "runs", "handles", "has". (hook: block)
+- Empty -ing tails. A trailing participle that adds nothing: ", highlighting the...", ", ensuring...", ", reflecting...", ", underscoring...". Cut it, or start a new sentence with the concrete point. (hook: block)
+- False ranges. "from X to Y" or "everything from X to Y" for two things that aren't a real spectrum. List the actual items or cut. (hook: block)
+- Abstract jargon-as-technical. "substrate", "nexus", "paradigm", "flywheel", "north star", "vector" (when non-technical). Name the concrete thing. (hook: block; "vector" is judgment-only, legit in math/security)
 - Synonym cycling. Rotating "the tool / the platform / the solution / the system" for one thing to avoid repetition. Pick one term and repeat it. Repetition reads as clarity, not as a mistake. (judgment)
 - Colon overuse as a mid-sentence connector. "The reason is simple: it works" stacked repeatedly. Fine once; a tell at density. Use a period or a plain clause. (judgment)
 
@@ -336,7 +336,7 @@ These need a reader. The hook already blocks the regex-able cousins (tool-remnan
 - **Section summaries.** A recap sentence bolted to the end of every section ("In summary, the project..."). Trust the reader; delete. (judgment)
 - **Heading-structure tells.** Headings that contain only other headings (no body), skipped levels (H2 to H4), several H1s in one document, or thematic-break rules sprinkled between sections. Structural residue of generation, not authored hierarchy. (judgment)
 - **Collaborative / meta commentary.** Text addressing the reader or a reviewer directly, knowledge-cutoff disclaimers ("as of my last update"), or leftover placeholder/prompt text. None belong in finished copy. (hook blocks the common outros; judgment for the rest)
-- **Vague connection terms.** "in connection with", "in relation to", "with regard to" where a plain preposition (about, for, with) is exact. (hook: warn)
+- **Vague connection terms.** "in connection with", "in relation to", "with regard to" where a plain preposition (about, for, with) is exact. (hook: block)
 
 **Signs of HUMAN writing (the counter-signal - presence of these argues AGAINST slop):** the text predates late 2022; the author can explain why a specific choice was made; idiosyncratic, slightly irregular syntax; concrete references only someone present would know. Absence of every tell is not proof of a human - but these are what real authorship leaves behind. See `references/what-humans-do.md`.
 

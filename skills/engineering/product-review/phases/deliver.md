@@ -16,7 +16,7 @@ One draft comment per DRIFTED / MISSING / EXTRA item, anchored to the relevant f
 
 ## Tickets (--ticket, or when the user asks)
 
-One draft ticket per item the user picks (default: every MISSING). His ticket format: plain title, no adjectives, refer to other tickets by key; body with User story, Context (quoting the intent source), Acceptance criteria, Open questions. Show drafts in chat; create in Jira/Wrike only on go, using his account voice (first person).
+One draft ticket per item the user picks (default: every MISSING). The user's ticket format, when they have one; otherwise: plain title, no adjectives, refer to other tickets by key; body with User story, Context (quoting the intent source), Acceptance criteria, Open questions. Show drafts in chat; create in Jira/Wrike only on go, in the user's own voice (first person).
 
 ## Closing
 
