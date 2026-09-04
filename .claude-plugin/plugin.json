@@ -14,6 +14,5 @@
     "./skills/writing/deslop",
     "./skills/engineering/qa-review",
     "./skills/engineering/product-review"
-  ],
-  "hooks": "./hooks/hooks.json"
+  ]
 }
