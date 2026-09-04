@@ -1,0 +1,18 @@
+{
+  "name": "jarrheyd-skills",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Jarrhey De la Pena's agent skills",
+  "repository": { "type": "git", "url": "https://github.com/jarrheyd/skills" },
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test tests/ && python3 -m unittest discover -s tests -p 'test_*.py' -v",
+    "changeset": "changeset",
+    "version": "changeset version && node scripts/sync-plugin-version.mjs",
+    "check-plugin-version": "node scripts/sync-plugin-version.mjs --check"
+  },
+  "devDependencies": {
+    "@changesets/changelog-github": "^0.7.0",
+    "@changesets/cli": "^2.30.0"
+  }
+}
