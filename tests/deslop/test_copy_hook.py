@@ -48,6 +48,30 @@ BLOCKS = [
     ("restatement", "The invite button opens the native share sheet from the circle page. The invite button opens the native share sheet from the circle page."),
     ("filler transition", "Furthermore, the plan holds."),
     ("wordy", "We did this in order to ship."),
+    ("elliptical setup", "The best part? you don't lift a finger."),
+    ("elliptical setup capitalised", "Crazy thing? It actually worked."),
+    ("suspense answer", "Scary truth? You're already behind."),
+    ("suspense answer catch", "The catch? It costs nothing."),
+    ("justifier", "Here's the thing. It works."),
+    ("justifier truth is", "Truth is, it works."),
+    ("revelation hook", "What nobody tells you about hiring."),
+    ("revelation out loud", "The thing nobody says out loud."),
+    ("revelation secret", "The secret to fast onboarding."),
+    ("big reveal", "Here is what agents actually are."),
+    ("overhype", "This changes everything for small teams."),
+    ("will revolutionize", "This will revolutionize onboarding."),
+    ("fast-changing world", "In a fast-changing world we ship."),
+    ("dive into", "Let's dive into the numbers."),
+    ("opposing shutdown", "You don't need more tools, you need a system."),
+    ("philosophical reduction", "AI is not automating jobs, it's automating tasks."),
+    ("reduction isnt", "This isn't a bug, it's a feature."),
+    ("no x no y just z", "No meetings, no email, just work."),
+    ("law of threes words", "Fast. Cheap. Done."),
+    ("law of threes list", "It was fast, cheap, reliable."),
+    ("three adjectives mid", "A specific, careful, deliberate plan."),
+    ("emoji bullet", "🚀 Ship faster"),
+    ("emoji list bullet", "- ✅ done"),
+    ("uniform sentences", "We ship the build on Monday. We test the build on Tuesday. We fix the bugs on Wednesday. We review the fixes on Thursday."),
 ]
 
 PASSES = [
@@ -58,6 +82,11 @@ PASSES = [
     ("scope heading", "# Invites: what changed"),
     ("schedule not gloss", "# Migration, in three weeks"),
     ("one furthermore mid-sentence", "The plan holds and furthermore covers the edge."),
+    ("real question then answer", "Why did the build fail? The signing certificate expired on Tuesday, and nobody renewed it."),
+    ("varied sentences", "We ship Monday. Testing runs Tuesday and Wednesday, with a fix window after. Review is Thursday."),
+    ("three items with reason", "The three blockers are certificates, the missing OTP fixture, and the flaky login flow."),
+    ("need with reason", "You need a staging account before the suite can log in."),
+    ("emoji inside text", "Shipped the invite flow today 🎉 and the tests are green."),
 ]
 
 

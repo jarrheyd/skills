@@ -1,5 +1,7 @@
 # deslop
 
+Started as its own repo at [jarrheyd/deslop](https://github.com/jarrheyd/deslop); that repo is archived and this folder is the live one.
+
 A quality gate for AI-generated tells. It catches the words, phrases, structures, and visual defaults that read as machine-made, and blocks them before they ship, whoever or whatever wrote them.
 
 It only subtracts. A clean draft with no voice is still lifeless; bring your own voice or brand model for that, and let deslop strip what the model leaves behind.

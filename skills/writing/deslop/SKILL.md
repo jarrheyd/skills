@@ -29,7 +29,7 @@ Every pattern is a regex in `copy_slop_hook.py`; the literal list, with fixes, i
 
 - Throat-clearing openers and filler transitions at the start of a line.
 - The not-just-X reframe and its cousins: negation ladders, either-or reductions, rhetorical-question pile-ups.
-- Aspirational verbs (unlocking, harnessing, elevating, revolutionizing, seamless anything).
+- Aspirational verbs (unlocking, harnessing, elevating, seamless anything, the revolution verb in every tense).
 - Sycophancy, manufactured-candor openers, TikTok aphorisms, chatbot outros.
 - Vague attribution (unnamed studies, experts, critics), puffery about legacies and pivotal moments, dead metaphors about needles, levers, and missing pieces.
 - Weak copulas, wordy forms, empty "-ing" tails, false ranges, AI disclaimers, abstract jargon nouns.
@@ -37,7 +37,10 @@ Every pattern is a regex in `copy_slop_hook.py`; the literal list, with fixes, i
 - Typography: em dashes (including HTML entities), curly quotes, middot separators, Title Case headings, bold as decoration, a period-terminated bold fragment used as a paragraph title.
 - Explainer headings that gloss the artifact instead of naming the subject.
 - Restatement: two adjacent sentences or bullets sharing 90 percent of their content words. Parallel lists with different values pass.
-- Hyphenated-compound titles and triple-adjective cadence.
+- Hyphenated-compound titles, three adjectives in a row, and the law of threes (three one-word sentences, or a sentence that closes on three single-word items).
+- Hook-and-reveal rhythms: the elliptical setup (a two-word question as a drumroll, then the answer), the suspense-then-answer, the unneeded justifier before a point, the revelation hook (the thing nobody supposedly says), the big-reveal frame (what a thing supposedly is underneath), and overhype (claims of changing everything or starting a revolution).
+- False choices: the opposing shutdown (you do not need X, you need Y), the philosophical reduction (X is not Y, it is Z), and the no-X-no-Y-just-Z slogan.
+- Rhythm: a paragraph of four or more sentences all the same length; emoji used as bullets or line openers.
 - Density per 500 words: the tier-one AI vocabulary at more than one, the tier-two set at more than two.
 
 ## What the design hook blocks

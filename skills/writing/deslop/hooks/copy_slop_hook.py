@@ -132,6 +132,29 @@ BANNED_PHRASES = [
     (r"(?i)\b(?:iykyk|if\s+you\s+know,?\s+you\s+know)\b", "aphorism: 'iykyk' - say it or cut it"),
     (r"(?i)\bit\s+came\s+back\s+(?:null|empty|surprising|clean|exactly)\b", "passive result rhythm: 'it came back X' - name what was found"),
     (r"(?i)\boperationali[sz]", "tech-bro abstraction: 'operationalize' - say what will actually be done"),
+
+    # Hook-and-reveal rhythms (added 2026-09-05)
+    (r"(?i)(?:^|[.!:]\s+)(?:the\s+)?(?:best|worst|crazy|craziest|wild|wildest|funny|scary|hard|harsh|brutal|honest|real|good|bad|plot)\s+(?:part|thing|truth|news|twist)\?\s+\S",
+     "elliptical setup: 'the best part? ...' / 'crazy thing? ...' - a question fragment as a drumroll; state the point"),
+    (r"(?i)(?:^|[.!:]\s+)(?:the\s+)?(?:catch|kicker|twist|result|secret|truth|problem|thing|lesson|takeaway|upshot|reality|irony|answer|difference|reason)\?\s+\S",
+     "suspense-then-answer: 'the catch? ...' / 'the truth? ...' - drop the fake question, write the sentence"),
+    (r"(?i)\b(?:the\s+truth\s+is|truth\s+is|let'?s\s+be\s+(?:honest|real|clear)|here'?s\s+the\s+(?:thing|deal|truth|reality|catch|kicker)|here'?s\s+what\s+(?:nobody|no\s+one|most\s+people))\b",
+     "unneeded justifier: 'here's the thing' / 'the truth is' / 'let's be honest' - cut the wind-up"),
+    (r"(?i)\b(?:what\s+)?(?:nobody|no\s+one|no-one|they)\s+(?:tells?|talks?\s+about|says?|wants?\s+you\s+to\s+know|mentions?)\b[^.]{0,40}\b(?:you|out\s+loud|this|that)\b",
+     "revelation hook: 'what nobody tells you' / 'the thing nobody says out loud' - name the fact, skip the conspiracy"),
+    (r"(?i)\b(?:the\s+secret\s+to|the\s+one\s+thing|the\s+real\s+reason)\b", "revelation hook: 'the secret to' / 'the one thing' / 'the real reason' - just say it"),
+    (r"(?i)\bwhat\s+\w+(?:\s+\w+){0,3}\s+(?:actually|really)\s+(?:is|are|means?|does|do|looks?\s+like)\b",
+     "big-reveal frame: 'what X actually is' - state what it is"),
+    (r"(?i)\b(?:changes?\s+everything|game[- ]chang|mind[- ]blowing|you\s+won'?t\s+believe|stop\s+scrolling|nobody\s+is\s+talking\s+about|this\s+is\s+huge|blew\s+my\s+mind)\b",
+     "overhype: 'changes everything' / 'game-changer' / 'you won't believe' - the content should earn it; say the specific gain"),
+    (r"(?i)\b(?:will|to|could|can)\s+revolutioni[sz]e\b|\brevolutioni[sz](?:es|ed|ing)\b", "overhype: 'will revolutionize' - say what actually changes"),
+    (r"(?i)\b(?:fast|rapidly|ever|constantly)[- ]changing\s+(?:world|landscape|market|industry|environment|times)\b", "banned phrase: 'fast-changing world' - empty preamble"),
+    (r"(?i)\b(?:let'?s\s+)?(?:deep[- ])?div(?:e|ing)\s+(?:in|into|deep)\b", "banned phrase: 'dive into' / 'deep dive' - say 'look at' or name the thing"),
+    (r"(?i)\b(?:you|we|they|people|teams)\s+don'?t\s+need\s+(?:a\s+|an\s+|the\s+|more\s+)?\w+(?:\s+\w+){0,4}[,;.]\s*(?:you|we|they|people|teams)\s+need\b",
+     "opposing shutdown: 'you don't need X, you need Y' - a false choice; make the actual recommendation"),
+    (r"(?i)\b(?:is|are|was|were)\s+not\s+(?:\w+ing\s+)?\w+(?:\s+\w+){0,4},\s+(?:it'?s|they'?re|but)\s+(?:\w+ing\s+)?\w+|\b(?:isn'?t|aren'?t)\s+(?:about\s+)?\w+(?:\s+\w+){0,4},\s+(?:it'?s|they'?re|but)\s+",
+     "philosophical reduction: 'X is not Y, it's Z' - the not-X-but-Y reframe in a lab coat; state the claim plainly"),
+    (r"(?i)\bno\s+\w+(?:\s+\w+)?,\s+no\s+\w+(?:\s+\w+)?[,.]\s*(?:just|only)\s+\w+", "'no X, no Y, just Z' - a slogan shape; write the sentence"),
 ]
 
 # ============================================================
@@ -455,6 +478,37 @@ def check_middot_separator(content):
     return violations
 
 
+EMOJI_RANGE = "\U0001F300-\U0001FAFF\u2600-\u27BF\u2B00-\u2BFF"
+
+
+def check_emoji_bullets(content):
+    """BLOCK: an emoji used as a bullet or a line opener."""
+    violations = []
+    for i, line in enumerate(content.split("\n"), 1):
+        if re.match(r"^\s*(?:[-*+]\s+)?[" + EMOJI_RANGE + r"]\ufe0f?\s+\S", line):
+            violations.append((i, "[BLOCK] emoji as a bullet or line opener - cut it; the words carry it"))
+    return violations
+
+
+def check_uniform_sentences(content):
+    """BLOCK: a paragraph of four or more sentences all within one word of the same length."""
+    violations = []
+    cleaned = _strip_code_and_tables(content)
+    for para in re.split(r"\n\s*\n", cleaned):
+        p = para.strip()
+        if not p or p.startswith(("#", "-", "*", "`", "|", ">")):
+            continue
+        counts = [len(sn.split()) for sn in _split_sentences(p) if sn.split()]
+        if len(counts) >= 4 and max(counts) - min(counts) <= 1 and min(counts) >= 4:
+            line_no = 0
+            for i, line in enumerate(content.split("\n"), 1):
+                if p[:40] in line:
+                    line_no = i
+                    break
+            violations.append((line_no, f"[BLOCK] every sentence in this paragraph is {min(counts)} to {max(counts)} words - one rhythm is a tell; vary the length"))
+    return violations
+
+
 def check_structural_tics(content):
     """BLOCK: rhythm-level tells that need more than a phrase match."""
     violations = []
@@ -463,7 +517,9 @@ def check_structural_tics(content):
         (r"\bNot\s+[^.\n]{1,30}\.\s+Not\s+[^.\n]{1,30}\.", "'Not X. Not Y.' negation ladder - state the actual figure or fact"),
         (r"(?i)^either\s+[^.\n]{3,60}\s+or\s+[^.\n]{3,60}\.\s*$", "either-or reductive framing - name the real options, or drop the frame"),
         (r"\bthe-\w+(?:-\w+){2,}\b", "hyphenated-compound title ('the-thing-that-broke story') - write the phrase out"),
-        (r"(?i)\b(\w{4,}(?:ly|ive|ful|ous|al|ic|ate|ent)),\s+(\w{4,}(?:ly|ive|ful|ous|al|ic|ate|ent)),\s+(?:and\s+)?(\w{4,}(?:ly|ive|ful|ous|al|ic|ate|ent))\b[.!]", "triple-adjective cadence ('specific, careful, deliberate.') - keep the one that carries the point"),
+        (r"(?i)\b(\w{4,}(?:ly|ive|ful|ous|al|ic|ate|ent)),\s+(\w{4,}(?:ly|ive|ful|ous|al|ic|ate|ent)),\s+(?:and\s+)?(\w{4,}(?:ly|ive|ful|ous|al|ic|ate|ent))\b", "three adjectives in a row ('specific, careful, deliberate') - keep the one that carries the point"),
+        (r"(?i)(?:^|[.!?]\s+)[A-Z]?\w+\.\s+\w+\.\s+\w+\.(?:\s|$)", "law of threes ('Fast. Cheap. Done.') - three one-word sentences as a beat; write one sentence"),
+        (r"(?i)\b\w+,\s+\w+,\s+\w+\.\s*$", "law of threes: a sentence that closes on three single words with no 'and' - cut to the one that matters, or say why all three"),
     ]
     for i, line in enumerate(content.split("\n"), 1):
         stripped = line.strip()
@@ -665,7 +721,7 @@ def main():
     middot = check_middot_separator(content)
     explainer = check_explainer_headings(content)
     restate = check_restatement(content)
-    tics = check_structural_tics(content)
+    tics = check_structural_tics(content) + check_emoji_bullets(content) + check_uniform_sentences(content)
     # Everything blocks; there is no warn tier. Density, filler transitions, weak copulas,
     # -ing tails, wordy phrases and false ranges all block. Em dashes block on any occurrence.
     # Paragraph-length uniformity is deliberately not checked: it false-positives on every

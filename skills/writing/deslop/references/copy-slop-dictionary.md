@@ -360,3 +360,23 @@ For emails and any copy a busy person skims:
 - **Subject line: short and concise.** Preview text: one sentence that ADDS info, does not repeat the subject.
 - **No fabricated claims** - never assert a number, outcome, or fact you cannot back.
 - **No two-beat antithesis** ("it's not X, it's Y") and **no aphorism formulas** ("X, but make it Y", "X is the new Y"). Already blocked by the hook; called out here because they are the ones that slip into "polished" copy.
+
+## Hook-and-reveal rhythms (added 2026-09-05, all enforced by the hook)
+
+Short-form and social patterns that leaked into everything else. Every one is a regex in `copy_slop_hook.py`.
+
+- Elliptical setup. A one- or two-word question as a drumroll, then the answer: "The best part? You don't lift a finger." / "Crazy thing? It actually worked." Fix: write the sentence. "You don't lift a finger."
+- Suspense, then answer. "Scary truth? You're already behind." / "The catch? It costs nothing." Fix: state the fact.
+- Unneeded justifier. "Here's the thing", "Here's the truth", "Truth is", "Let's be honest". The wind-up before a point that needed none. Fix: cut it.
+- Revelation hook. "What nobody tells you about X", "The thing nobody says out loud", "The secret to X", "The real reason". Fix: name the fact.
+- Big reveal. "What X actually is", "What X really means". Fix: say what it is.
+- Overhype. "Changes everything", "game-changer", "mind-blowing", "you won't believe", "will revolutionize", "this is huge". Fix: the specific gain, with a number if there is one.
+- "Fast-changing world", "rapidly changing landscape", "ever-changing market". Preamble. Fix: delete.
+- "Dive into", "deep dive", "let's dive in". Fix: "look at", or just name the thing.
+- Opposing shutdown. "You don't need more tools, you need a system." A false choice dressed as advice. Fix: make the recommendation and say why.
+- Philosophical reduction. "AI is not automating jobs, it's automating tasks." / "This isn't a bug, it's a feature." The not-X-but-Y reframe in a lab coat. Fix: state the claim plainly and support it.
+- "No X, no Y, just Z." A slogan shape. Fix: write the sentence.
+- Three adjectives in a row. "Specific, careful, deliberate." Fix: keep the one that carries the point.
+- Law of threes. "Fast. Cheap. Done." or a sentence that closes on three single words with no "and" ("fast, cheap, reliable."). A plain list with an "and" passes. Fix: one sentence, or say why all three matter.
+- Every sentence the same length. Four or more sentences in a paragraph within a word of each other. Fix: vary the rhythm on purpose.
+- Emoji as bullets or line openers. Fix: cut them; a documented, fixed section-marker set in a recurring format is the one exception (judgment, the hook still blocks it, use `DESLOP_SKIP_PATHS` for such files).

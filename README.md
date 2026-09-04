@@ -2,7 +2,7 @@
 
 Agent skills I use every day, shipped as one Claude Code plugin and as editable files for any Agent-Skills harness.
 
-- **[deslop](./skills/writing/deslop/SKILL.md)**: a quality gate for AI-generated tells. Three hooks block AI copy tells, AI-default visual tells, and both again on artifacts and Drive docs, before they ship. Plus a manual review with a detector and a humanizer agent.
+- **[deslop](./skills/writing/deslop/SKILL.md)** (started at [jarrheyd/deslop](https://github.com/jarrheyd/deslop), now archived): a quality gate for AI-generated tells. Three hooks block AI copy tells, AI-default visual tells, and both again on artifacts and Drive docs, before they ship. Plus a manual review with a detector and a humanizer agent.
 - **[qa-review](./skills/engineering/qa-review/SKILL.md)**: Maestro e2e audits for web and mobile. Walks the app like a user, keeps screenshot evidence on your machine, and ends in one HTML report you greenlight a release from. Also cross-checks a QA test script against the live app.
 - **[product-review](./skills/engineering/product-review/SKILL.md)**: is what got built the thing that was asked for? Builds an intent model from the ticket, the design, and you, then judges the PR or the deployed app against it, in plain language, with pictures.
 
