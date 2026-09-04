@@ -15,13 +15,24 @@ Everything it writes is plain language. The audience is product managers and des
 
 ## Install
 
+As part of the `jarrheyd-skills` plugin:
+
 ```bash
-git clone https://github.com/jarrheyd/product-review ~/.claude/skills/product-review
+claude plugin marketplace add jarrheyd/skills
+claude plugin install jarrheyd-skills@jarrheyd
+```
+
+Or as editable files through skills.sh:
+
+```bash
+npx skills@latest add jarrheyd/skills --skill=product-review
 ```
 
 Claude Code picks it up as `/product-review`. Works with any agent that can run shell commands; everything is markdown and plain scripts.
 
-Pairs well with [qa-review](https://github.com/jarrheyd/qa-review) (shares its screenshot evidence) and a grill-style questioning skill for the intent interview, but neither is required.
+Pairs well with qa-review from the same repo (shares its screenshot evidence) and a grill-style questioning skill for the intent interview, but neither is required. Without a build or URL it runs code-only and says so; see `phases/evidence.md`.
+
+A recorded run against a real pull request is in `examples/kindred-pr-696/`.
 
 ## Where things go
 
@@ -34,10 +45,7 @@ Pairs well with [qa-review](https://github.com/jarrheyd/qa-review) (shares its s
 ```
 SKILL.md        entry point + hard rules
 phases/         intent, evidence, verdict, deliver
-scripts/        build-review.mjs (the report builder)
+scripts/        build-review.mjs (the report builder, validates review.json)
 references/     intent model template, plain-language contract
+examples/       a recorded run
 ```
-
-## License
-
-MIT

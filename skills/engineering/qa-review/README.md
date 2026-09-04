@@ -67,6 +67,3 @@ templates/        manifest, config, screen-walk, _login, flow header
 references/       flow conventions, verdicts, product rubric, web driving
 ```
 
-## License
-
-MIT
