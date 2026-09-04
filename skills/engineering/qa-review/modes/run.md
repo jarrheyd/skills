@@ -12,7 +12,7 @@ Run flows and hand the human the report. The cheap, everyday mode.
 3. Read `<run>/run-summary.json`. ONLY that file.
 4. For each failed flow: open its `lastScreenshot`, state what broke in one line each. Do not open passing flows' screenshots.
 5. Open the report for the human (`open <run>/report.html`).
-6. Report: pass/fail count, the greenlight line, each failure with its one-line cause, where the report is.
+6. Report: pass/fail count, the greenlight line, each failure with its one-line cause, any flow marked `retried` (it passed only on the second try: say so, a flake is a finding), where the report is.
 
 ## Fixing failures
 

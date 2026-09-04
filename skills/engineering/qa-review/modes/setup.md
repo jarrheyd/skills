@@ -10,11 +10,11 @@ Check and report, fix what you can:
 
 - `maestro` on PATH (`~/.maestro/bin`). Missing: `curl -fsSL "https://get.maestro.mobile.dev" | bash`
 - Java runtime (`java -version`). Missing on macOS: `brew install --cask temurin` (needs the user or brew permission)
-- Mobile: Xcode + at least one available simulator (`xcrun simctl list devices available`). Web: nothing extra.
+- iOS: Xcode + at least one available simulator (`xcrun simctl list devices available`). Android: `adb devices` shows one online. Web: nothing extra.
 
 ## 2. Detect the platform
 
-React Native / Expo / iOS / Android project: `platform: mobile`. Next/React/Vue/anything served over HTTP: `platform: web`. Monorepos with both: ask which surface to cover first; one config per surface.
+React Native / Expo / iOS project: `platform: mobile`. Android-only, or a mobile project you will drive on an emulator: `platform: android`. Next/React/Vue/anything served over HTTP: `platform: web`. Monorepos with both: ask which surface to cover first; one config per surface.
 
 ## 3. Explore the code
 

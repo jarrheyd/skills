@@ -73,9 +73,31 @@ if ! java -version >/dev/null 2>&1; then
 fi
 
 DEVICE_ARGS=()
-if [ "$PLATFORM" = "mobile" ]; then
-  # Boot the named simulator if nothing is booted yet.
-  UDID="$(xcrun simctl list devices booted | grep -m1 -oE '[0-9A-F-]{36}' || true)"
+if [ "$PLATFORM" = "android" ]; then
+  # Android: best-effort. Needs a running emulator or connected device (adb devices).
+  command -v adb >/dev/null || { echo "scout-run: adb not on PATH; install Android platform-tools" >&2; exit 1; }
+  SERIAL="$(adb devices | awk 'NR>1 && $2=="device" {print $1; exit}')"
+  [ -n "$SERIAL" ] || { echo "scout-run: no Android device or emulator online (adb devices). Start one and rerun." >&2; exit 1; }
+  DEVICE_ARGS=(--device "$SERIAL")
+  if [ -n "$BUILD_CMD" ] && [ "${SCOUT_SKIP_BUILD:-}" != "1" ]; then
+    echo "scout-run: building app ($BUILD_CMD). Set SCOUT_SKIP_BUILD=1 to reuse the installed build."
+    (cd "$REPO" && eval "$BUILD_CMD")
+  else
+    echo "scout-run: SKIPPED build step (SCOUT_SKIP_BUILD=1 or no buildCmd); testing the already-installed binary"
+  fi
+  if [ -n "$INSTALL_CMD" ] && [ "${SCOUT_SKIP_BUILD:-}" != "1" ]; then
+    (cd "$REPO" && eval "$INSTALL_CMD")
+  fi
+elif [ "$PLATFORM" = "mobile" ]; then
+  # Prefer a booted simulator matching the configured name; else any booted one; else boot the named one.
+  UDID="$(xcrun simctl list devices booted | grep -m1 "$SIMULATOR (" | grep -oE '[0-9A-F-]{36}' || true)"
+  if [ -z "$UDID" ]; then
+    BOOTED="$(xcrun simctl list devices booted | grep -m1 -oE '[0-9A-F-]{36}' || true)"
+    if [ -n "$BOOTED" ]; then
+      echo "scout-run: NOTE using the already-booted simulator $BOOTED, not \"$SIMULATOR\" from scout.config.json"
+      UDID="$BOOTED"
+    fi
+  fi
   if [ -z "$UDID" ]; then
     UDID="$(xcrun simctl list devices available | grep -m1 "$SIMULATOR (" | grep -oE '[0-9A-F-]{36}' || true)"
     [ -n "$UDID" ] || { echo "scout-run: simulator \"$SIMULATOR\" not found" >&2; exit 1; }
@@ -115,6 +137,14 @@ else
   done
 fi
 [ ${#SELECTED[@]} -gt 0 ] || { echo "scout-run: no flows selected (tag=$TAG)" >&2; exit 1; }
+
+# Web flows carry their own url: header, so guard every selected flow's target too,
+# not only the config value.
+for f in "${SELECTED[@]}"; do
+  for u in $(grep -hoE '^\s*(url|-\s*openLink):\s*\S+' "$f" | awk '{print $NF}' | tr -d '"'"'"'"'); do
+    "$SCRIPT_DIR/guard-env.sh" "$u" >/dev/null
+  done
+done
 echo "scout-run: running ${#SELECTED[@]} flow(s): ${SELECTED[*]}"
 
 # One invocation for the set; per-flow retry for failures. A wedged driver call

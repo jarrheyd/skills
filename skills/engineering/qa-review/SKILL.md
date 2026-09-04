@@ -9,7 +9,7 @@ license: MIT
 
 # qa-review
 
-Drive the app the way a user would, keep the proof, and let a human greenlight from one report. Maestro runs the flows on a simulator (mobile) or Chrome (web); scripts assemble the evidence; the AI reads only a small summary. Works with any AI agent that can run shell commands.
+Drive the app the way a user would, keep the proof, and let a human greenlight from one report. Maestro runs the flows on an iOS simulator, an Android emulator, or Chrome (web); scripts assemble the evidence; the AI reads only a small summary. Works with any AI agent that can run shell commands.
 
 ## Modes
 
@@ -29,13 +29,13 @@ Read ONLY the mode file for the invoked mode. If no mode is named, ask which one
 - Local device (never committed): `~/.scout/<project>/` holds `.env` (credentials, user-filled) and `runs/<timestamp>/` (Maestro debug output, screenshots, JUnit XML, `run-summary.json`, `report.html`)
 - Skill scripts: `scripts/` in this skill directory. Call them with absolute paths; they take the project via `--project <name>` or `SCOUT_PROJECT`.
 
-`scout.config.json` (committed, no secrets): `{ "project": "<name>", "platform": "mobile|web", "appId" | "url", "buildCmd", "installCmd", "errorCopy": ["..."], "envKeys": ["SCOUT_USER", ...] }`.
+`scout.config.json` (committed, no secrets): `{ "project": "<name>", "platform": "mobile|android|web", "appId" | "url", "buildCmd", "installCmd", "errorCopy": ["..."], "envKeys": ["SCOUT_USER", ...] }`.
 
 ## Hard rules (every mode)
 
 1. Token efficiency. Scripts do the driving and the report assembly. After a run, read `run-summary.json` only. Open a screenshot only when its step failed or a mode explicitly flags it. Never page through full filmstrips; the human does that in `report.html`.
 2. Credentials live only in `~/.scout/<project>/.env`. You write placeholder keys, the user fills values. Never read the values back into chat, never put them in flows (flows use `${SCOUT_USER}`-style env refs), never screenshot a password on screen.
-3. Never production. `scripts/guard-env.sh` runs before every suite. If the target does not look like dev/staging/localhost it refuses; only the user exporting `SCOUT_ALLOW_PROD=1` overrides it. Test or staging accounts only.
+3. Never production. `scripts/guard-env.sh` runs before every suite, on the config target and on every selected flow's own `url:`. A target passes only when a hostname label or bundle-id segment is a dev/staging/test marker; only the user exporting `SCOUT_ALLOW_PROD=1` overrides it. Test or staging accounts only.
 4. Fail loud. Never swallow a failing step to keep a run green. A bounded or skipped check is named in the summary so "passed" never quietly means "did not run".
 5. Finish with the report. Every run ends by opening `report.html` for the human (`open` on macOS, `xdg-open` on Linux). The report is the deliverable; your text is a short verdict on top of it.
 6. Repo hygiene. Nothing generated lands in the target repo except flows, manifest, and config. If a project insists on in-repo output, append `templates/gitignore-snippet` to its `.gitignore` first.
@@ -48,7 +48,7 @@ Follow `references/conventions.md` for every flow you write or edit. Short versi
 
 - `maestro` on PATH (`~/.maestro/bin`); install: `curl -fsSL "https://get.maestro.mobile.dev" | bash`
 - A Java runtime (Maestro needs it): `brew install --cask temurin` on macOS
-- Mobile: Xcode + booted simulator, or Android emulator. Web: Chrome.
+- iOS: Xcode + a simulator. Android: `adb` + a running emulator. Web: Chrome.
 
 ## References
 

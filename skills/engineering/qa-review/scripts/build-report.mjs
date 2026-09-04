@@ -77,17 +77,28 @@ const maxShots = Number(args.shots || 6);
 const buildLabel = args.build || 'local run';
 const reviewedAt = args.now ? new Date(args.now) : new Date();
 
+// A retry result file (result-retry-<flow>.xml) is authoritative over the base
+// result.xml for that flow, whatever order the files arrive in. summarize-run.mjs
+// applies the same rule, so the summary the agent reads and the report the human
+// reads always agree.
 function junitStatus() {
   const map = {};
-  for (const file of (args.junit || '').split(',').map((f) => f.trim()).filter(Boolean)) {
+  const files = (args.junit || '').split(',').map((f) => f.trim()).filter(Boolean);
+  const ordered = [...files.filter((f) => !/retry/.test(path.basename(f))), ...files.filter((f) => /retry/.test(path.basename(f)))];
+  for (const file of ordered) {
     if (!fs.existsSync(file)) continue;
     const xml = fs.readFileSync(file, 'utf8');
+    const isRetry = /retry/.test(path.basename(file));
     for (const m of xml.matchAll(/<testcase\b[^>]*\bname="([^"]+)"[^>]*(\/>|>([\s\S]*?)<\/testcase>)/g)) {
-      map[m[1].replace(/\.yaml$/, '')] = /<failure|<error/.test(m[3] || '') ? 'failed' : 'passed';
+      const flow = m[1].replace(/\.yaml$/, '');
+      const failed = /<failure|<error/.test(m[3] || '');
+      map[flow] = failed ? 'failed' : 'passed';
+      if (isRetry) retried.add(flow);
     }
   }
   return map;
 }
+const retried = new Set();
 const status = junitStatus();
 
 // --previous: borrow reels from an older report for flows this run did not
@@ -141,6 +152,7 @@ for (const j of manifest.journeys) {
 // inlining so the page stays small. Frames render narrow, so ~1000px is
 // retina-crisp at a fraction of raw PNG size. Falls back to the raw file when
 // sips is missing (non-macOS).
+let rawEmbeds = 0;
 const IMG_MAX_PX = Number(args.imgpx || 1000);
 const IMG_QUALITY = Number(args.imgq || 86);
 const b64 = (p) => {
@@ -152,6 +164,7 @@ const b64 = (p) => {
     fs.unlinkSync(tmp);
   } catch {
     buf = fs.readFileSync(p);
+    rawEmbeds += 1;
   }
   const mime = buf[0] === 0xff && buf[1] === 0xd8 ? 'image/jpeg' : 'image/png';
   return `data:${mime};base64,${buf.toString('base64')}`;
@@ -182,11 +195,12 @@ function journeyCard(j) {
     : borrowed
       ? `<div class="reel-note">Not captured in this run. Showing the previous run.</div><div class="reel">${borrowed}</div>`
       : `<div class="reel-empty">${planned ? 'Planned. The flow for this is not built yet.' : 'Not captured in this run.'}</div>`;
+  const label = st === 'failed' ? 'Needs a look' : (retried.has(j.flow) ? 'Passed on retry' : 'Verified');
   const chip = planned
-    ? `<span class="stamp planned"><span class="dot"></span>Planned</span>`
+    ? `<span class="stamp planned">Planned</span>`
     : (reviewed
-        ? `<span class="stamp ${st === 'failed' ? 'warn' : 'ok'}"><span class="dot"></span>${st === 'failed' ? 'Needs a look' : 'Verified'} ${esc(reviewed)}</span>`
-        : `<span class="stamp pending"><span class="dot"></span>Not run yet</span>`);
+        ? `<span class="stamp ${st === 'failed' ? 'warn' : (retried.has(j.flow) ? 'retry' : 'ok')}">${label} ${esc(reviewed)}</span>`
+        : `<span class="stamp pending">Not run yet</span>`);
   return `<article class="qa${st === 'failed' ? ' off' : ''}${planned ? ' planned' : ''}" data-flow="${esc(j.flow)}">
       <h3>${esc(j.q)}</h3>
       <p>${esc(j.a)}</p>
@@ -212,9 +226,9 @@ function crosscheckSection() {
       <td>${esc(c.note || '')}</td></tr>`).join('');
   const counts = {};
   for (const c of crosscheck.cases) counts[c.verdict] = (counts[c.verdict] || 0) + 1;
-  const tally = Object.entries(counts).map(([v, n]) => `${n} ${v.toLowerCase()}`).join(' · ');
+  const tally = Object.entries(counts).map(([v, n]) => `${n} ${v.toLowerCase()}`).join(', ');
   return `<section class="extra"><h2>Test-script crosscheck</h2>
-    <p class="sub">${esc(crosscheck.source || '')} · ${tally}</p>
+    <p class="sub">${esc(crosscheck.source || '')}, ${tally}</p>
     <div class="tablewrap"><table><thead><tr><th>Case</th><th>Title</th><th>Verdict</th><th>Note</th></tr></thead>
     <tbody>${rows}</tbody></table></div>
     ${crosscheck.scriptReview ? `<h3>Script review</h3><ul>${crosscheck.scriptReview.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>` : ''}
@@ -292,7 +306,7 @@ const html = `<!doctype html>
   .cat[data-empty]{display:none!important}
   .nomatch{color:var(--soft);font-size:16px;font-style:italic;margin:40px 0;text-align:center}
   .tab{font-size:14px;font-weight:600;color:var(--soft);cursor:pointer;user-select:none;
-    padding:7px 14px;border-radius:999px;border:1px solid var(--line);background:var(--raise)}
+    padding:6px 2px;border-bottom:2px solid transparent}
   .tab:hover{color:var(--ink)}
   ${tabCss}
   .cat{display:block}
@@ -318,13 +332,11 @@ const html = `<!doctype html>
   .reel-empty{color:var(--faint);font-size:15px;font-style:italic;padding:20px;
     border:1px dashed var(--line);border-radius:14px;background:var(--raise)}
   .foot{margin-top:14px}
-  .stamp{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--faint)}
-  .stamp .dot{width:7px;height:7px;border-radius:50%;flex:none}
-  .stamp.ok .dot{background:var(--ok)}
-  .stamp.warn{color:var(--bad)}
-  .stamp.warn .dot{background:var(--bad)}
+  .stamp{font-size:13px;color:var(--faint)}
+  .stamp.ok{color:var(--ok)}
+  .stamp.warn{color:var(--bad);font-weight:600}
+  .stamp.retry{color:#7A5A12}
   .stamp.planned,.stamp.pending{color:var(--faint)}
-  .stamp.planned .dot,.stamp.pending .dot{background:var(--line)}
   .qa.planned{opacity:0.72}
   .qa.planned h3{color:var(--faint)}
   .extra{margin-top:48px;padding-top:8px;border-top:1px solid var(--line)}
@@ -334,20 +346,19 @@ const html = `<!doctype html>
   table{border-collapse:collapse;width:100%;font-size:15px}
   th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
   th{color:var(--faint);font-weight:600}
-  .verdict{font-weight:700;font-size:13px;padding:2px 9px;border-radius:999px;white-space:nowrap}
-  .v-pass .verdict,.verdict.v-pass{color:var(--ok);background:var(--wash)}
-  .verdict.v-fail{color:#fff;background:var(--bad)}
-  .verdict.v-script{color:#7A5A12;background:#F5ECD6}
-  .verdict.v-wire{color:#4A4A6A;background:#E9E9F2}
-  .verdict.v-block{color:var(--soft);background:var(--raise)}
-  footer{margin-top:56px;padding-top:24px;border-top:1px solid var(--line);color:var(--faint);font-size:13.5px}
+  .verdict{font-weight:700;font-size:13px;white-space:nowrap}
+  .v-pass .verdict,.verdict.v-pass{color:var(--ok)}
+  .verdict.v-fail{color:var(--bad)}
+  .verdict.v-script{color:#7A5A12}
+  .verdict.v-wire{color:#4A4A6A}
+  .verdict.v-block{color:var(--soft)}
   @media (max-width:520px){.page{padding:44px 18px 72px}header h1{font-size:26px}.phone{width:150px}.browser{width:300px}}
 </style></head><body>
 <div class="page">
   <header>
     <h1>${esc(title)}</h1>
     ${manifest.intro ? `<p class="intro">${esc(manifest.intro)}</p>` : ''}
-    <div class="meta">${esc(buildLabel)} · <b>${greenlight ? 'all journeys green' : `${failedCount} need${failedCount === 1 ? 's' : ''} a look`}</b> · ${verifiedCount} verified${plannedCount ? ` · ${plannedCount} planned` : ''}</div>
+    <div class="meta">${esc(buildLabel)}. <b>${greenlight ? 'All journeys green' : (failedCount ? `${failedCount} need${failedCount === 1 ? 's' : ''} a look` : `${builtJourneys.length - reviewedFlows.length} not run this time`)}</b>. ${verifiedCount} verified${plannedCount ? `, ${plannedCount} planned` : ''}</div>
   </header>
   <div class="search">
     <input id="q" type="search" placeholder="Search flows" aria-label="Search flows" autocomplete="off" />
@@ -361,7 +372,6 @@ const html = `<!doctype html>
     ${gapsSection()}
     ${productSection()}
   </main>
-  <footer>Built by qa-review. Each "last reviewed" date is the real day that journey last ran; screenshots are captured by the flows themselves.</footer>
 </div>
 <script>
 (function () {
@@ -401,4 +411,5 @@ const html = `<!doctype html>
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
 fs.writeFileSync(outPath, html);
 if (statePath) fs.writeFileSync(statePath, JSON.stringify(state, null, 2) + '\n');
-console.log(`Wrote ${outPath} (${(html.length / 1024 / 1024).toFixed(1)} MB) · reviewed ${reviewedFlows.length}/${manifest.journeys.length} this run · ${failedCount} failing`);
+if (rawEmbeds) console.error(`build-report: ${rawEmbeds} screenshot(s) embedded at full size (sips not available; macOS only). The report is larger than it needs to be.`);
+console.log(`Wrote ${outPath} (${(html.length / 1024 / 1024).toFixed(1)} MB), reviewed ${reviewedFlows.length}/${manifest.journeys.length} this run, ${failedCount} failing`);

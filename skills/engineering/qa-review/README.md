@@ -2,7 +2,7 @@
 
 An e2e audit skill for AI coding agents. Plug it into any web or mobile project and it walks the app the way a user would, keeps screenshot evidence on your machine, and builds one skimmable HTML report you can greenlight a release from.
 
-Maestro does the driving (simulator for mobile, Chrome for web). Plain scripts assemble the report, so the agent spends almost no tokens on evidence and the whole thing works with any model that can run shell commands.
+Maestro does the driving (iOS simulator, Android emulator, or Chrome for web). Plain scripts assemble the report, so the agent spends almost no tokens on evidence and the whole thing works with any model that can run shell commands.
 
 ## What it does
 
@@ -16,12 +16,23 @@ Maestro does the driving (simulator for mobile, Chrome for web). Plain scripts a
 
 - Committed to your repo: `.maestro/flows/*.yaml`, `journeys.manifest.json`, `scout.config.json`. A few KB; the flows are team assets.
 - Your machine only: `~/.scout/<project>/` with your `.env` (test credentials, you fill it) and `runs/` (screenshots, JUnit, `report.html`). The last 2 runs are kept, older ones auto-pruned.
-- Never: screenshots or reports in the repo, credentials anywhere but your `.env`, runs against production (the guard refuses non-dev-looking targets).
+- Never: screenshots or reports in the repo, credentials anywhere but your `.env`, runs against production (the guard refuses any target whose hostname labels or bundle-id segments carry no dev/staging/test marker, and checks every flow's own `url:` too).
+
+Note: `buildCmd` and `installCmd` in the committed `scout.config.json` are executed by the runner. Treat that file like a build script: review changes to it in code review.
 
 ## Install
 
+As part of the `jarrheyd-skills` plugin:
+
 ```bash
-git clone https://github.com/jarrheyd/qa-review ~/.claude/skills/qa-review
+claude plugin marketplace add jarrheyd/skills
+claude plugin install jarrheyd-skills@jarrheyd
+```
+
+Or as editable files through skills.sh:
+
+```bash
+npx skills@latest add jarrheyd/skills --skill=qa-review
 ```
 
 Claude Code picks it up as `/qa-review`. Saying "scout" still triggers it: that was the original name, and the internal names stay put so projects onboarded under it keep working (`scout.config.json`, `scout-run.sh`, `SCOUT_*` env vars, the `~/.scout/` evidence root). For other agents, point them at `SKILL.md`; everything is plain markdown and scripts.
@@ -33,7 +44,7 @@ curl -fsSL "https://get.maestro.mobile.dev" | bash   # maestro, adds ~/.maestro/
 brew install --cask temurin                           # Java runtime (macOS)
 ```
 
-Mobile projects also need Xcode with a simulator (or an Android emulator).
+iOS projects need Xcode with a simulator. Android needs `adb` on PATH and a running emulator or device (`platform: android`, best-effort: the runner picks the first online device). Screenshots are downscaled with macOS `sips`; on Linux they embed at full size and the report gets larger.
 
 ## Quickstart
 

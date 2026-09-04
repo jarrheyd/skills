@@ -36,12 +36,14 @@ for (const file of junitFiles) {
     const time = Number((attrs.match(/\btime="([^"]+)"/) || [])[1] || 0);
     // A retry result file for the same flow overrides an earlier failure.
     const isRetry = /retry/.test(path.basename(file));
+    // Base result.xml never overrides a retry entry for the same flow.
+    if (flows[flow] && !isRetry && flows[flow].retried) continue;
     if (flows[flow] && !isRetry && flows[flow].status === 'passed') continue;
     flows[flow] = {
       status: failed ? 'failed' : 'passed',
       timeSec: time || flows[flow]?.timeSec || 0,
       ...(failed && failMsg ? { failure: failMsg.trim().slice(0, 500) } : {}),
-      ...(failed && isRetry ? { retried: true } : {}),
+      ...(isRetry || flows[flow]?.retried ? { retried: true } : {}),
     };
   }
 }

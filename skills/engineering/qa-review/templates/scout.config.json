@@ -1,5 +1,5 @@
 {
-  "_comment": "Committed with the repo; never put secrets here. platform: mobile|web. Mobile uses appId + buildCmd/installCmd + simulator; web uses url (flows also carry url: themselves). errorCopy = the app's literal error-state strings, greped from source, used by screen-walk assertNotVisible. envKeys = the credential keys the user must fill in ~/.scout/<project>/.env.",
+  "_comment": "Committed with the repo; never put secrets here. platform: mobile|android|web. mobile (iOS) uses appId + buildCmd/installCmd + simulator; android uses appId + buildCmd/installCmd and the first online adb device; web uses url (flows also carry url: themselves). errorCopy = the app's literal error-state strings, greped from source, used by screen-walk assertNotVisible. envKeys = the credential keys the user must fill in ~/.scout/<project>/.env.",
   "project": "acme",
   "platform": "mobile",
   "appId": "com.example.acme.dev",
