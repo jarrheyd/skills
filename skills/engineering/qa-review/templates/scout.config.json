@@ -1,0 +1,12 @@
+{
+  "_comment": "Committed with the repo; never put secrets here. platform: mobile|web. Mobile uses appId + buildCmd/installCmd + simulator; web uses url (flows also carry url: themselves). errorCopy = the app's literal error-state strings, greped from source, used by screen-walk assertNotVisible. envKeys = the credential keys the user must fill in ~/.scout/<project>/.env.",
+  "project": "acme",
+  "platform": "mobile",
+  "appId": "com.example.acme.dev",
+  "url": "",
+  "buildCmd": "npx react-native run-ios --mode Release",
+  "installCmd": "",
+  "simulator": "iPhone 17",
+  "errorCopy": ["Something went wrong", "We couldn't load this"],
+  "envKeys": ["SCOUT_USER", "SCOUT_PASS"]
+}

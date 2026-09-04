@@ -1,0 +1,60 @@
+# Reusable login sub-flow. Credentials come from ~/.scout/<project>/.env via
+# scout-run.sh (-e SCOUT_USER=... -e SCOUT_PASS=...), never hardcoded.
+#
+# Only use against dev/staging where login is deterministic (fixed test OTP or
+# a plain password account). The resolver pattern below is state-agnostic:
+# whatever screen the app resumes on, each bounded pass nudges toward home and
+# stops once the main navigation is mounted. Anchor on testIDs, not copy.
+#
+# Maestro 2.8 gotcha: a subflow's env DEFAULT overrides the caller's -e value.
+# Do not set env defaults here; treat unset as false/empty in conditions.
+appId: com.example.acme.dev
+---
+- launchApp
+- extendedWaitUntil:
+    visible: ".*(Log in|Sign in|Home).*"
+    timeout: 30000
+
+# Resolve to home from wherever the app landed. Bounded passes: dismiss system
+# prompts, skip resumed onboarding, run the login form when it shows. Once the
+# main nav mounts, the guard is false and remaining passes no-op.
+- repeat:
+    times: 8
+    commands:
+      - runFlow:
+          when:
+            notVisible:
+              id: "tab-home"
+          commands:
+            - tapOn:
+                text: "Cancel"
+                optional: true
+            - tapOn:
+                text: "Maybe later"
+                optional: true
+            - tapOn:
+                text: "Log in"
+                optional: true
+            - runFlow:
+                when:
+                  visible:
+                    id: "login-email-input"
+                commands:
+                  - tapOn:
+                      id: "login-email-input"
+                  - inputText: ${SCOUT_USER}
+                  - tapOn:
+                      id: "login-password-input"
+                  - inputText: ${SCOUT_PASS}
+                  - tapOn: "Continue"
+            - waitForAnimationToEnd:
+                timeout: 3000
+
+# Land in the app: anchor on an element that is always present once logged in.
+- extendedWaitUntil:
+    visible:
+      id: "tab-home"
+    timeout: 30000
+- tapOn:
+    id: "tab-home"
+    optional: true
