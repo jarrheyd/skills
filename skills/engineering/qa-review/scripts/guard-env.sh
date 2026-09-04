@@ -22,6 +22,15 @@ if [ "${SCOUT_ALLOW_PROD:-}" = "1" ]; then
 fi
 
 lower="$(printf '%s' "$TARGET" | tr '[:upper:]' '[:lower:]')"
+# An app-scheme deep link (kapwa://..., myapp://...) has no host to judge: it
+# opens whichever build is installed, and that build's appId already passed
+# this guard. Only web URLs and bundle ids are judged by their labels.
+case "$lower" in
+  http://*|https://*) ;;
+  *://*)
+    echo "guard-env: app-scheme deep link opens the installed app, proceeding: $TARGET"
+    exit 0;;
+esac
 # Host part of a URL, or the whole thing for a bundle id.
 host="$lower"
 case "$host" in

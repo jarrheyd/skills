@@ -158,12 +158,45 @@ run_maestro() { # args: junit-out, flows...
   local cmd=(maestro ${DEVICE_ARGS[@]+"${DEVICE_ARGS[@]}"} test "$@" ${ENV_ARGS[@]+"${ENV_ARGS[@]}"} --format junit --output "$out" --debug-output "$RUN_DIR/debug")
   if [ -n "$TIMEOUT_BIN" ]; then "$TIMEOUT_BIN" "${SCOUT_SUITE_TIMEOUT:-3600}" "${cmd[@]}"; else "${cmd[@]}"; fi
 }
+# Portable per-flow timeout: macOS has no `timeout`; perl's alarm does the job.
+with_timeout() { # secs, cmd...
+  local secs="$1"; shift
+  if [ -n "$TIMEOUT_BIN" ]; then "$TIMEOUT_BIN" "$secs" "$@"; else perl -e 'alarm shift; exec @ARGV' "$secs" "$@"; fi
+}
+run_flow() { # args: junit-out, flow
+  local out="$1" flow="$2"
+  with_timeout "${SCOUT_FLOW_TIMEOUT:-900}" maestro ${DEVICE_ARGS[@]+"${DEVICE_ARGS[@]}"} test "$flow" ${ENV_ARGS[@]+"${ENV_ARGS[@]}"} --format junit --output "$out" --debug-output "$RUN_DIR/debug"
+}
+# Per-flow mode: one maestro invocation per flow. Maestro validates the whole
+# workspace before a multi-flow run and aborts everything on a single addMedia
+# path it cannot resolve (0 flows executed); per-flow runs are immune and also
+# isolate a wedged driver to one flow. Default on; SCOUT_PER_FLOW=0 for the
+# single-invocation mode.
+PER_FLOW="${SCOUT_PER_FLOW:-1}"
 set +e
-run_maestro "$RESULT" "${SELECTED[@]}"
-SUITE_RC=$?
+if [ "$PER_FLOW" = "1" ]; then
+  SUITE_RC=0
+  FAILED_LIST=""
+  for f in "${SELECTED[@]}"; do
+    name="$(basename "${f%.yaml}")"
+    echo "scout-run: [$name] running"
+    run_flow "$RUN_DIR/result-$name.xml" "$f"
+    rc=$?
+    if [ $rc -ne 0 ]; then SUITE_RC=1; FAILED_LIST="$FAILED_LIST $name"; echo "scout-run: [$name] FAILED (rc=$rc)"; else echo "scout-run: [$name] passed"; fi
+  done
+  if [ -n "$FAILED_LIST" ] && [ "${SCOUT_NO_RETRY:-}" != "1" ]; then
+    echo "scout-run: retrying failed flows once:$FAILED_LIST"
+    for name in $FAILED_LIST; do
+      run_flow "$RUN_DIR/result-retry-$name.xml" "flows/$name.yaml" && echo "scout-run: [$name] passed on retry" || echo "scout-run: [$name] failed again"
+    done
+  fi
+else
+  run_maestro "$RESULT" "${SELECTED[@]}"
+  SUITE_RC=$?
+fi
 set -e
 
-if [ $SUITE_RC -ne 0 ] && [ "${SCOUT_NO_RETRY:-}" != "1" ]; then
+if [ "$PER_FLOW" != "1" ] && [ $SUITE_RC -ne 0 ] && [ "${SCOUT_NO_RETRY:-}" != "1" ]; then
   echo "scout-run: suite had failures (rc=$SUITE_RC), retrying failed flows once"
   FAILED=$(node -e "
     const fs=require('fs');
