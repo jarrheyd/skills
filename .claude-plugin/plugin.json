@@ -1,6 +1,6 @@
 {
   "name": "jarrheyd-skills",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Jarrhey De la Pena's agent skills: deslop (blocks AI copy and visual tells before they ship), qa-review (Maestro e2e audits with screenshot evidence), product-review (checks what was built against what was asked for).",
   "author": {
     "name": "Jarrhey De la Pena",
