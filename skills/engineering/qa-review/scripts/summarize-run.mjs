@@ -73,9 +73,17 @@ for (const [flow, info] of Object.entries(flows)) {
 
 const list = Object.entries(flows).map(([flow, v]) => ({ flow, ...v }));
 const failed = list.filter((f) => f.status === 'failed');
+// What was under test, written by the runner. Carried forward here so the
+// summary the agent reads names the build the same way the report does.
+const build = (() => {
+  const f = path.join(runDir, 'build.json');
+  if (!fs.existsSync(f)) return null;
+  try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; }
+})();
 const summary = {
   runDir,
   at: new Date().toISOString(),
+  build,
   total: list.length,
   passed: list.length - failed.length,
   failed: failed.length,

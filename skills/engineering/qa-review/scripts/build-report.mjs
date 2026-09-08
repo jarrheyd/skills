@@ -20,7 +20,9 @@
 //     --product    <product-notes.json>      (optional UX-findings section)
 //     --build    "pre-deploy 2026-08-31"     (footer label)
 //     --shots    6                           (max screenshots per journey)
-//     --previous <older report.html>         (borrow reels for flows not captured)
+//     --previous <older report.html>         (carry reels forward for flows not run)
+//     --buildinfo <run>/build.json           (what was under test, from the runner)
+//     --carrydays 7                          (how long carried evidence counts green)
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -101,8 +103,20 @@ function junitStatus() {
 const retried = new Set();
 const status = junitStatus();
 
-// --previous: borrow reels from an older report for flows this run did not
-// capture. Borrowed reels are labeled so they never read as fresh evidence.
+// What was under test this run, written by scout-run.sh. Null when the runner
+// could not fingerprint the build; carried evidence then always expires, so an
+// unknown build never counts as green.
+const currentBuild = (() => {
+  if (!args.buildinfo || !fs.existsSync(args.buildinfo)) return null;
+  try { return JSON.parse(fs.readFileSync(args.buildinfo, 'utf8')); } catch { return null; }
+})();
+
+// --previous: carry reels forward from an older report for flows this run did
+// not capture, along with WHEN they were captured and WHICH build they show.
+// Provenance travels in the markup (data-captured, data-build), so a reel that
+// survives several partial runs still reports its original date instead of
+// decaying into "the previous run".
+const CARRY_DAYS = Number(args.carrydays || 7);
 const previousReels = (() => {
   const out = {};
   if (!args.previous || !fs.existsSync(args.previous)) return out;
@@ -110,10 +124,29 @@ const previousReels = (() => {
   for (const m of html.matchAll(/<article[^>]*data-flow="([^"]+)"[\s\S]*?<\/article>/g)) {
     const reel = m[0].match(/<div class="reel">([\s\S]*?)<\/div>\s*(?:<div class="(?:meta|foot)|<\/article>)/);
     if (!reel || /reel-empty/.test(m[0])) continue;
-    out[m[1]] = reel[1];
+    out[m[1]] = {
+      reel: reel[1],
+      captured: (m[0].match(/data-captured="([^"]*)"/) || [])[1] || null,
+      build: (m[0].match(/data-build="([^"]*)"/) || [])[1] || null,
+    };
   }
   return out;
 })();
+
+// Evidence from an earlier run counts as green only while it still describes
+// this build AND is younger than the carry window. Anything else still shows,
+// marked as needing a rerun, with the reason spelled out.
+function carriedFor(flow) {
+  const p = previousReels[flow];
+  if (!p || !p.reel) return null;
+  const ageMs = p.captured ? (reviewedAt - new Date(p.captured)) : Infinity;
+  const sameBuild = !!(currentBuild?.hash && p.build && p.build === currentBuild.hash);
+  const inWindow = ageMs < CARRY_DAYS * 864e5;
+  const reason = !currentBuild?.hash || !p.build
+    ? 'the build it ran against is unknown'
+    : (!sameBuild ? 'it ran before the current build' : `it is more than ${CARRY_DAYS} days old`);
+  return { ...p, fresh: sameBuild && inWindow, reason };
+}
 
 function shotsFor(flow, cap = maxShots) {
   // Prefer explicit takeScreenshot/ captures (the journey's real moments, in
@@ -184,24 +217,46 @@ const figure = (src, alt) => isWeb
   ? `<figure class="browser"><span class="chrome"><i></i><i></i><i></i></span><span class="screen"><img loading="lazy" src="${src}" alt="${alt}" /></span></figure>`
   : `<figure class="phone"><span class="screen"><img loading="lazy" src="${src}" alt="${alt}" /></span></figure>`;
 
+// Five states: ran this time (fresh or failed), did not run but has evidence
+// still describing this build (carried), did not run and its evidence is stale
+// (expired), or never ran at all.
+function cardState(j) {
+  if (j.planned) return { kind: 'planned' };
+  // Real screenshot files on disk always beat a reel scraped out of old HTML.
+  if (ranThisRun(j.flow) || shotsFor(j.flow).length) return { kind: 'fresh' };
+  const carried = carriedFor(j.flow);
+  if (carried) return { kind: carried.fresh ? 'carried' : 'expired', carried };
+  return { kind: 'never' };
+}
+
 function journeyCard(j) {
   const planned = !!j.planned;
+  const { kind, carried } = cardState(j);
   const st = planned ? 'planned' : (state[j.flow]?.status || (status[j.flow] || (shotsFor(j.flow).length ? 'passed' : 'pending')));
   const reviewed = fmtDate(state[j.flow]?.lastReviewed);
   const shots = planned ? [] : shotsFor(j.flow, j.shots || maxShots);
-  const borrowed = !planned && !shots.length && previousReels[j.flow];
   const film = shots.length
     ? `<div class="reel">${shots.map((s) => figure(b64(s), esc(j.q))).join('')}</div>`
-    : borrowed
-      ? `<div class="reel-note">Not captured in this run. Showing the previous run.</div><div class="reel">${borrowed}</div>`
-      : `<div class="reel-empty">${planned ? 'Planned. The flow for this is not built yet.' : 'Not captured in this run.'}</div>`;
+    : kind === 'carried'
+      ? `<div class="reel-note">Not run this time. Showing the run of ${esc(fmtDate(carried.captured) || 'an earlier day')}, on this same build.</div><div class="reel">${carried.reel}</div>`
+      : kind === 'expired'
+        ? `<div class="reel-note">Not run this time, and ${esc(carried.reason)}. Showing the run of ${esc(fmtDate(carried.captured) || 'an earlier day')}. Needs a rerun.</div><div class="reel stale">${carried.reel}</div>`
+        : `<div class="reel-empty">${planned ? 'Planned. The flow for this is not built yet.' : 'Not captured in this run.'}</div>`;
   const label = st === 'failed' ? 'Needs a look' : (retried.has(j.flow) ? 'Passed on retry' : 'Verified');
   const chip = planned
     ? `<span class="stamp planned">Planned</span>`
-    : (reviewed
-        ? `<span class="stamp ${st === 'failed' ? 'warn' : (retried.has(j.flow) ? 'retry' : 'ok')}">${label} ${esc(reviewed)}</span>`
-        : `<span class="stamp pending">Not run yet</span>`);
-  return `<article class="qa${st === 'failed' ? ' off' : ''}${planned ? ' planned' : ''}" data-flow="${esc(j.flow)}">
+    : kind === 'carried'
+      ? `<span class="stamp ok">Verified ${esc(fmtDate(carried.captured) || '')}, carried</span>`
+      : kind === 'expired'
+        ? `<span class="stamp pending">Needs a rerun</span>`
+        : (reviewed
+            ? `<span class="stamp ${st === 'failed' ? 'warn' : (retried.has(j.flow) ? 'retry' : 'ok')}">${label} ${esc(reviewed)}</span>`
+            : `<span class="stamp pending">Not run yet</span>`);
+  // Provenance for the next report to carry forward: a fresh reel stamps this
+  // run's date and build, a carried one passes the original's through unchanged.
+  const captured = shots.length ? iso : (carried?.captured || '');
+  const builtOn = shots.length ? (currentBuild?.hash || '') : (carried?.build || '');
+  return `<article class="qa${st === 'failed' ? ' off' : ''}${planned ? ' planned' : ''}" data-flow="${esc(j.flow)}" data-captured="${esc(captured)}" data-build="${esc(builtOn)}">
       <h3>${esc(j.q)}</h3>
       <p>${esc(j.a)}</p>
       ${film}
@@ -271,7 +326,23 @@ const plannedCount = manifest.journeys.length - builtJourneys.length;
 const reviewedFlows = builtJourneys.filter((j) => ranThisRun(j.flow));
 const failedCount = reviewedFlows.filter((j) => (state[j.flow]?.status) === 'failed').length;
 const verifiedCount = reviewedFlows.length - failedCount;
-const greenlight = failedCount === 0 && reviewedFlows.length === builtJourneys.length;
+const notRun = builtJourneys.filter((j) => !ranThisRun(j.flow));
+const carriedCount = notRun.filter((j) => cardState(j).kind === 'carried').length;
+const expiredCount = notRun.filter((j) => cardState(j).kind === 'expired').length;
+const neverCount = notRun.length - carriedCount - expiredCount;
+// Carried evidence counts toward green, but is always named separately, so a
+// partial run can never read as a full pass.
+const greenlight = failedCount === 0 && (verifiedCount + carriedCount) === builtJourneys.length;
+const headline = failedCount
+  ? `${failedCount} need${failedCount === 1 ? 's' : ''} a look`
+  : (greenlight ? 'All journeys green' : `${expiredCount + neverCount} still to run`);
+const breakdown = [
+  `${verifiedCount} verified this run`,
+  carriedCount ? `${carriedCount} carried` : '',
+  expiredCount ? `${expiredCount} need${expiredCount === 1 ? 's' : ''} a rerun` : '',
+  neverCount ? `${neverCount} never run` : '',
+  plannedCount ? `${plannedCount} planned` : '',
+].filter(Boolean).join(', ');
 
 const title = manifest.title || `${config.project || project || 'App'} flows`;
 const html = `<!doctype html>
@@ -329,6 +400,7 @@ const html = `<!doctype html>
   .browser .screen{display:block;background:#fff;aspect-ratio:16/10}
   .browser img{width:100%;height:100%;display:block;object-fit:cover;object-position:top}
   .reel-note{color:var(--faint);font-size:13px;font-style:italic;padding:10px 0 0}
+  .reel.stale{opacity:.55}
   .reel-empty{color:var(--faint);font-size:15px;font-style:italic;padding:20px;
     border:1px dashed var(--line);border-radius:14px;background:var(--raise)}
   .foot{margin-top:14px}
@@ -358,7 +430,7 @@ const html = `<!doctype html>
   <header>
     <h1>${esc(title)}</h1>
     ${manifest.intro ? `<p class="intro">${esc(manifest.intro)}</p>` : ''}
-    <div class="meta">${esc(buildLabel)}. <b>${greenlight ? 'All journeys green' : (failedCount ? `${failedCount} need${failedCount === 1 ? 's' : ''} a look` : `${builtJourneys.length - reviewedFlows.length} not run this time`)}</b>. ${verifiedCount} verified${plannedCount ? `, ${plannedCount} planned` : ''}</div>
+    <div class="meta">${esc(buildLabel)}. <b>${headline}</b>. ${breakdown}</div>
   </header>
   <div class="search">
     <input id="q" type="search" placeholder="Search flows" aria-label="Search flows" autocomplete="off" />

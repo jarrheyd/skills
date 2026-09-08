@@ -80,6 +80,101 @@ test('guard-env refuses substring matches and allows real markers', () => {
   assert.equal(spawnSync('bash', [guard]).status, 1);
 });
 
+// Carry-forward: a flow that did not run this time still shows its last
+// evidence, and counts green only while that evidence describes this build and
+// is inside the carry window.
+function carryDir({ buildHash, ranFlow = 'home' }) {
+  const d = tmp();
+  fs.mkdirSync(path.join(d, 'debug'));
+  fs.writeFileSync(path.join(d, 'result.xml'), `<testsuite><testcase name="${ranFlow}.yaml"/></testsuite>`);
+  fs.writeFileSync(path.join(d, 'm.json'), JSON.stringify({ title: 't', categories: ['A'], journeys: [
+    { flow: 'login', category: 'A', q: 'q', a: 'a' }, { flow: 'home', category: 'A', q: 'q2', a: 'a2' }] }));
+  if (buildHash) fs.writeFileSync(path.join(d, 'build.json'), JSON.stringify({ kind: 'binary', hash: buildHash, at: new Date().toISOString() }));
+  return d;
+}
+// A stand-in for last week's report: one card with a real reel and provenance.
+function priorReport(d, { captured, build }) {
+  const p = path.join(d, 'previous.html');
+  fs.writeFileSync(p, `<article class="qa" data-flow="login" data-captured="${captured}" data-build="${build}">
+    <h3>q</h3><p>a</p><div class="reel"><figure class="phone">OLDSHOT</figure></div>
+    <div class="foot"><span class="stamp ok">Verified</span></div></article>`);
+  return p;
+}
+function carryReport(d, previous, extra = []) {
+  const out = path.join(d, 'r.html');
+  execFileSync('node', [path.join(S, 'build-report.mjs'), '--manifest', path.join(d, 'm.json'),
+    '--debug', path.join(d, 'debug'), '--junit', path.join(d, 'result.xml'), '--out', out,
+    '--state', path.join(d, 's.json'), '--previous', previous,
+    ...(fs.existsSync(path.join(d, 'build.json')) ? ['--buildinfo', path.join(d, 'build.json')] : []),
+    ...extra], { stdio: 'pipe' });
+  return fs.readFileSync(out, 'utf8');
+}
+const DAYS = (n) => new Date(Date.now() - n * 864e5).toISOString();
+
+test('same build, inside the window: evidence carries and counts green', () => {
+  const d = carryDir({ buildHash: 'abc123' });
+  const html = carryReport(d, priorReport(d, { captured: DAYS(2), build: 'abc123' }));
+  assert.match(html, /OLDSHOT/);
+  assert.match(html, /on this same build/);
+  assert.match(html, /carried/);
+  assert.match(html, /All journeys green/);
+  assert.doesNotMatch(html, /reel stale/);
+});
+
+test('build changed: evidence still shows, dimmed, and does not count green', () => {
+  const d = carryDir({ buildHash: 'NEWBUILD' });
+  const html = carryReport(d, priorReport(d, { captured: DAYS(1), build: 'abc123' }));
+  assert.match(html, /OLDSHOT/);
+  assert.match(html, /reel stale/);
+  assert.match(html, /ran before the current build/);
+  assert.match(html, /Needs a rerun/);
+  assert.doesNotMatch(html, /All journeys green/);
+});
+
+test('older than the carry window: expired even on the same build', () => {
+  const d = carryDir({ buildHash: 'abc123' });
+  const html = carryReport(d, priorReport(d, { captured: DAYS(30), build: 'abc123' }));
+  assert.match(html, /reel stale/);
+  assert.match(html, /more than 7 days old/);
+  assert.doesNotMatch(html, /All journeys green/);
+});
+
+test('no build fingerprint: carried evidence expires rather than counting green', () => {
+  const d = carryDir({ buildHash: null });
+  const html = carryReport(d, priorReport(d, { captured: DAYS(1), build: 'abc123' }));
+  assert.match(html, /reel stale/);
+  assert.match(html, /build it ran against is unknown/);
+  assert.doesNotMatch(html, /All journeys green/);
+});
+
+test('provenance survives a chain of carries', () => {
+  const first = carryDir({ buildHash: 'abc123' });
+  const once = carryReport(first, priorReport(first, { captured: DAYS(1), build: 'abc123' }));
+  const chained = path.join(first, 'chained.html');
+  fs.writeFileSync(chained, once);
+  // Carrying a carried reel keeps the ORIGINAL date and build, so age is
+  // measured from the real capture and never resets on every partial run.
+  const second = carryDir({ buildHash: 'abc123' });
+  const html = carryReport(second, chained);
+  assert.match(html, /OLDSHOT/);
+  assert.match(html, /data-build="abc123"/);
+  assert.match(html, /carried/);
+});
+
+test('the carry window is configurable', () => {
+  const d = carryDir({ buildHash: 'abc123' });
+  const html = carryReport(d, priorReport(d, { captured: DAYS(10), build: 'abc123' }), ['--carrydays', '30']);
+  assert.doesNotMatch(html, /reel stale/);
+});
+
+test('header counts each state and never reads as a full pass on a partial run', () => {
+  const d = carryDir({ buildHash: 'NEWBUILD' });
+  const html = carryReport(d, priorReport(d, { captured: DAYS(1), build: 'abc123' }));
+  assert.match(html, /1 verified this run/);
+  assert.match(html, /1 needs a rerun/);
+  assert.match(html, /still to run/);
+});
+
 test('open-report opens the report, and says so when it cannot', () => {
   const opener = path.join(S, 'open-report.sh');
   const d = tmp();

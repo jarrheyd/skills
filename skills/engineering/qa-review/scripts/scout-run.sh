@@ -120,6 +120,50 @@ else
   echo "scout-run: web platform, flows drive Chrome directly"
 fi
 
+# Build fingerprint: what was actually under test, so a later report can tell
+# whether evidence it carried forward still describes this build. The installed
+# binary is the honest answer on device: under SCOUT_SKIP_BUILD=1 the commit
+# moves while the binary does not, and a sideloaded build changes the binary
+# while the commit does not. Web has no binary, so the commit is all there is.
+# No fingerprint means carried evidence expires rather than counting green.
+build_fingerprint() {
+  case "$PLATFORM" in
+    mobile)
+      local container exe
+      container="$(xcrun simctl get_app_container "$UDID" "$APP_ID" app 2>/dev/null || true)"
+      [ -n "$container" ] && [ -d "$container" ] || return 0
+      exe="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$container/Info.plist" 2>/dev/null || true)"
+      [ -n "$exe" ] && [ -f "$container/$exe" ] || return 0
+      printf 'binary %s' "$(shasum -a 256 "$container/$exe" | awk '{print $1}')"
+      ;;
+    android)
+      local apk
+      apk="$(adb -s "$SERIAL" shell pm path "$APP_ID" 2>/dev/null | head -1 | sed 's/^package://' | tr -d '\r')"
+      [ -n "$apk" ] || return 0
+      printf 'binary %s' "$(adb -s "$SERIAL" shell md5sum "$apk" 2>/dev/null | awk '{print $1}' | tr -d '\r')"
+      ;;
+    *)
+      local sha dirty
+      sha="$(git -C "$REPO" rev-parse HEAD 2>/dev/null || true)"
+      [ -n "$sha" ] || return 0
+      dirty=""
+      git -C "$REPO" diff --quiet 2>/dev/null || dirty="-dirty"
+      printf 'commit %s%s' "$sha" "$dirty"
+      ;;
+  esac
+}
+FINGERPRINT="$(build_fingerprint || true)"
+if [ -n "$FINGERPRINT" ]; then
+  node -e "
+    const fs=require('fs');
+    const [kind,...rest]=process.argv[1].split(' ');
+    fs.writeFileSync('$RUN_DIR/build.json', JSON.stringify({kind,hash:rest.join(' '),at:new Date().toISOString()},null,2)+'\n');
+  " "$FINGERPRINT"
+  echo "scout-run: build fingerprint ${FINGERPRINT%% *} ${FINGERPRINT##* }"
+else
+  echo "scout-run: NOTE no build fingerprint for platform $PLATFORM; carried evidence will expire instead of counting green"
+fi
+
 # Flow selection in bash (mirrors the production suites): glob flows/*.yaml,
 # skip _partials, keep everything or only files whose tag block contains TAG.
 cd "$REPO/.maestro"
@@ -218,7 +262,10 @@ node "$SCRIPT_DIR/summarize-run.mjs" --run "$RUN_DIR"
 
 if [ "$BUILD_REPORT" = "1" ]; then
   JUNITS="$(ls "$RUN_DIR"/result*.xml 2>/dev/null | tr '\n' ',' | sed 's/,$//')"
-  PREV="$(ls -t "$HOME_DIR"/runs/*/report.html 2>/dev/null | sed -n 2p || true)"
+  # The current run has no report.html yet, so the newest one on disk IS the
+  # previous run. Taking line 2 reached back two runs, which pruning to 2 runs
+  # usually deleted, so nothing was ever carried forward.
+  PREV="$(ls -t "$HOME_DIR"/runs/*/report.html 2>/dev/null | sed -n 1p || true)"
   node "$SCRIPT_DIR/build-report.mjs" \
     --project "$PROJECT" \
     --manifest "$REPO/.maestro/journeys.manifest.json" \
@@ -227,6 +274,7 @@ if [ "$BUILD_REPORT" = "1" ]; then
     --junit "$JUNITS" \
     --out "$RUN_DIR/report.html" \
     --build "run $(date +%Y-%m-%d\ %H:%M)" \
+    ${FINGERPRINT:+--buildinfo "$RUN_DIR/build.json"} \
     ${PREV:+--previous "$PREV"}
 fi
 
