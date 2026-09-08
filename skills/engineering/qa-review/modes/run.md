@@ -4,11 +4,11 @@ Run flows and hand the human the report. The cheap, everyday mode.
 
 ## Steps
 
-1. Locate the repo's `.maestro/scout.config.json` (no config: switch to setup mode).
-2. Run: `scripts/scout-run.sh --repo <repo> [--tag <tag>] [--flows "<a.yaml b.yaml>"]`
+1. Locate the repo's `.maestro/qa-review.config.json` (no config: switch to setup mode).
+2. Run: `scripts/qa-review-run.sh --repo <repo> [--tag <tag>] [--flows "<a.yaml b.yaml>"]`
    - `--tag smoke` (or `critical`) for the quick gate; no tag runs everything
    - The script handles guard-env, simulator/build, env injection, retry-once, summary, report, pruning, and opening the report
-   - Reuse an installed build with `SCOUT_SKIP_BUILD=1` when the user says the build has not changed
+   - Reuse an installed build with `QA_REVIEW_SKIP_BUILD=1` when the user says the build has not changed
 3. Read `<run>/run-summary.json`. ONLY that file.
 4. For each failed flow: open its `lastScreenshot`, state what broke in one line each. Do not open passing flows' screenshots.
 5. The runner already opened `<run>/report.html`. If its output says it skipped or could not open, open it yourself: `scripts/open-report.sh <run>/report.html`.

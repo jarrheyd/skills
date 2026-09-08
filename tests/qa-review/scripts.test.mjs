@@ -76,7 +76,7 @@ test('guard-env refuses substring matches and allows real markers', () => {
   const allow = ['https://staging.acme.com', 'http://localhost:3000', 'com.acme.app.dev', 'https://dev2.acme.com', 'https://staging-eu.acme.com/login', 'https://app.acme.local', 'https://pr-12.preview.acme.com', 'https://user:pw@qa.acme.com:8443/x'];
   for (const t of refuse) assert.equal(spawnSync('bash', [guard, t]).status, 2, `${t} should be refused`);
   for (const t of allow) assert.equal(spawnSync('bash', [guard, t]).status, 0, `${t} should be allowed`);
-  assert.equal(spawnSync('bash', [guard, 'https://api.acme.com'], { env: { ...process.env, SCOUT_ALLOW_PROD: '1' } }).status, 0);
+  assert.equal(spawnSync('bash', [guard, 'https://api.acme.com'], { env: { ...process.env, QA_REVIEW_ALLOW_PROD: '1' } }).status, 0);
   assert.equal(spawnSync('bash', [guard]).status, 1);
 });
 
@@ -184,14 +184,14 @@ test('open-report opens the report, and says so when it cannot', () => {
   const fake = path.join(d, 'fake-open.sh');
   fs.writeFileSync(fake, `#!/usr/bin/env bash\necho "$1" > ${marker}\n`);
   fs.chmodSync(fake, 0o755);
-  const env = { ...process.env, SCOUT_OPEN_CMD: fake, CI: '' };
+  const env = { ...process.env, QA_REVIEW_OPEN_CMD: fake, CI: '' };
 
   const ok = spawnSync('bash', [opener, built], { env, encoding: 'utf8' });
   assert.equal(ok.status, 0);
   assert.equal(fs.readFileSync(marker, 'utf8').trim(), built);
 
   fs.rmSync(marker);
-  const off = spawnSync('bash', [opener, built], { env: { ...env, SCOUT_NO_OPEN: '1' }, encoding: 'utf8' });
+  const off = spawnSync('bash', [opener, built], { env: { ...env, QA_REVIEW_NO_OPEN: '1' }, encoding: 'utf8' });
   assert.equal(off.status, 0);
   assert.equal(fs.existsSync(marker), false);
   assert.match(off.stdout, /SKIPPED/);
@@ -202,14 +202,14 @@ test('open-report opens the report, and says so when it cannot', () => {
   assert.equal(spawnSync('bash', [opener], { env }).status, 1);
 });
 
-test('scout-run opens the report it built', () => {
-  const runner = fs.readFileSync(path.join(S, 'scout-run.sh'), 'utf8');
+test('qa-review-run opens the report it built', () => {
+  const runner = fs.readFileSync(path.join(S, 'qa-review-run.sh'), 'utf8');
   assert.match(runner, /open-report\.sh" "\$RUN_DIR\/report\.html"/);
 });
 
 test('prune-runs keeps the newest N', () => {
   const home = tmp();
-  const runs = path.join(home, '.scout', 'proj', 'runs');
+  const runs = path.join(home, '.qa-review', 'proj', 'runs');
   fs.mkdirSync(runs, { recursive: true });
   for (const n of ['a', 'b', 'c', 'd']) {
     fs.mkdirSync(path.join(runs, n));

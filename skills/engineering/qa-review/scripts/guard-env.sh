@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Refuses to run a scout suite against anything that looks like production.
+# Refuses to run a qa-review suite against anything that looks like production.
 # A target passes when one of its hostname labels or bundle-id segments IS a
 # non-production marker (dev, staging, stage, test, qa, sandbox, uat, preview,
 # local, localhost, 127.0.0.1, 0.0.0.0) or starts with one followed by a digit
 # or a hyphen (dev2, staging-eu, qa-1). Substrings inside ordinary words do not
 # count: app.devhub.com, latest.acme.com and backstage.io are refused.
-# Override only by the USER exporting SCOUT_ALLOW_PROD=1 in their own shell.
+# Override only by the USER exporting QA_REVIEW_ALLOW_PROD=1 in their own shell.
 #
 #   guard-env.sh <target>     target = URL (web) or appId (mobile)
 set -euo pipefail
@@ -16,8 +16,8 @@ if [ -z "$TARGET" ]; then
   exit 1
 fi
 
-if [ "${SCOUT_ALLOW_PROD:-}" = "1" ]; then
-  echo "guard-env: SCOUT_ALLOW_PROD=1 set by user, skipping the check for: $TARGET"
+if [ "${QA_REVIEW_ALLOW_PROD:-}" = "1" ]; then
+  echo "guard-env: QA_REVIEW_ALLOW_PROD=1 set by user, skipping the check for: $TARGET"
   exit 0
 fi
 
@@ -60,7 +60,7 @@ fi
 cat >&2 <<MSG
 guard-env: REFUSING to run against "$TARGET".
 No hostname label or bundle-id segment is a dev/staging/test marker, so it may be
-production. Scout only runs against test or staging environments with test accounts.
-If this target really is safe, the user (not the agent) can export SCOUT_ALLOW_PROD=1 and rerun.
+production. qa-review only runs against test or staging environments with test accounts.
+If this target really is safe, the user (not the agent) can export QA_REVIEW_ALLOW_PROD=1 and rerun.
 MSG
 exit 2

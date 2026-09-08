@@ -5,8 +5,8 @@
 #
 # Usage: open-report.sh <path/to/report.html>
 #
-# SCOUT_NO_OPEN=1 or CI set: print the path, open nothing.
-# SCOUT_OPEN_CMD: use this opener instead of open/xdg-open.
+# QA_REVIEW_NO_OPEN=1 or CI set: print the path, open nothing.
+# QA_REVIEW_OPEN_CMD: use this opener instead of open/xdg-open.
 set -euo pipefail
 
 REPORT="${1:-}"
@@ -17,12 +17,12 @@ if [ ! -f "$REPORT" ]; then
   exit 0
 fi
 
-if [ "${SCOUT_NO_OPEN:-}" = "1" ] || [ -n "${CI:-}" ]; then
-  echo "open-report: SKIPPED opening (SCOUT_NO_OPEN=1 or CI). Report: $REPORT"
+if [ "${QA_REVIEW_NO_OPEN:-}" = "1" ] || [ -n "${CI:-}" ]; then
+  echo "open-report: SKIPPED opening (QA_REVIEW_NO_OPEN=1 or CI). Report: $REPORT"
   exit 0
 fi
 
-OPENER="${SCOUT_OPEN_CMD:-}"
+OPENER="${QA_REVIEW_OPEN_CMD:-}"
 if [ -z "$OPENER" ]; then
   if command -v open >/dev/null 2>&1; then
     OPENER="open"

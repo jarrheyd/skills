@@ -30,8 +30,8 @@ Map, without asking the user:
 
 Only: target env URL or appId + how to build/install (or an existing build to reuse), which test account keys exist, and the 3 to 5 journeys that matter most if they have an opinion. Then:
 
-- Write `.maestro/scout.config.json` from `templates/scout.config.json`
-- Create `~/.scout/<project>/.env` with PLACEHOLDER lines for each key in `envKeys` (`SCOUT_USER=fill-me`); tell the user to fill it. Never ask for the values in chat.
+- Write `.maestro/qa-review.config.json` from `templates/qa-review.config.json`
+- Create `~/.qa-review/<project>/.env` with PLACEHOLDER lines for each key in `envKeys` (`QA_REVIEW_USER=fill-me`); tell the user to fill it. Never ask for the values in chat.
 
 ## 5. Generate
 
@@ -45,7 +45,7 @@ From the templates, adapted to the real code:
 
 ## 6. Run until green
 
-`scripts/scout-run.sh --repo <repo>` (guard-env runs inside it). Read `run-summary.json`. For each failure open ONLY that flow's last screenshot, fix the selector or flow, rerun just that flow (`--flows`). Loop until green or genuinely blocked (unfilled .env, env down); blocked is reported, not worked around.
+`scripts/qa-review-run.sh --repo <repo>` (guard-env runs inside it). Read `run-summary.json`. For each failure open ONLY that flow's last screenshot, fix the selector or flow, rerun just that flow (`--flows`). Loop until green or genuinely blocked (unfilled .env, env down); blocked is reported, not worked around.
 
 ## 7. Finish
 
@@ -55,7 +55,7 @@ Commit `.maestro/` (flows, manifest, config, plus any testIDs added to app code)
 
 For when the person has only a running app: a staging URL (web) or an installable build like a TestFlight/apk/.app (mobile). Maestro never needed source to drive; only the exploration changes.
 
-With no repo to commit into, the `.maestro/` folder (config, manifest, flows) lives in `~/.scout/<project>/workspace/` instead; scout-run.sh takes it via `--repo ~/.scout/<project>/workspace`. If the person later gets repo access, move the folder in and commit it.
+With no repo to commit into, the `.maestro/` folder (config, manifest, flows) lives in `~/.qa-review/<project>/workspace/` instead; qa-review-run.sh takes it via `--repo ~/.qa-review/<project>/workspace`. If the person later gets repo access, move the folder in and commit it.
 
 Discovery, in place of code exploration:
 
@@ -65,4 +65,4 @@ Discovery, in place of code exploration:
 
 Selector rules shift one notch: accessibility ids first when the hierarchy exposes them, visible text second, and every text selector gets a comment naming the screen so rot is easy to fix. Error detection falls back to generic strings ("Something went wrong", "Error", "Unable to", the platform's crash dialog) plus a screenshot after every screen; say in the manifest intro that error assertions are generic.
 
-Label the output honestly: set `"blackbox": true` in scout.config.json, and prefix the manifest intro with "Built without codebase access". Gap analysis in audit mode then compares against the test script or the crawl map only, and the report must say so; never present blackbox coverage as code-grounded.
+Label the output honestly: set `"blackbox": true` in qa-review.config.json, and prefix the manifest intro with "Built without codebase access". Gap analysis in audit mode then compares against the test script or the crawl map only, and the report must say so; never present blackbox coverage as code-grounded.

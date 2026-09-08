@@ -1,6 +1,6 @@
 ---
 name: qa-review
-description: (alias "scout") Maestro e2e audit skill for any web or mobile app. Walks the app screen per screen, captures evidence, and builds a skimmable local HTML report for QA and product review. Use when the user says "scout", wants to set up e2e flows, run a pre-deployment audit, cross-check a QA test script against the live app, review or author a test script, or wants screenshot proof that flows work before greenlighting a release.
+description: Maestro e2e audit skill for any web or mobile app. Walks the app screen per screen, captures evidence, and builds a skimmable local HTML report for QA and product review. Use when the user says "qa-review", wants to set up e2e flows, run a pre-deployment audit, cross-check a QA test script against the live app, review or author a test script, or wants screenshot proof that flows work before greenlighting a release.
 version: 1.0.0
 user-invocable: true
 argument-hint: "[setup|run|crosscheck|audit|review] [target]"
@@ -25,20 +25,20 @@ Read ONLY the mode file for the invoked mode. If no mode is named, ask which one
 
 ## Where things live
 
-- Target repo (committed, the only repo footprint): `.maestro/flows/*.yaml`, `.maestro/journeys.manifest.json`, `.maestro/scout.config.json`
-- Local device (never committed): `~/.scout/<project>/` holds `.env` (credentials, user-filled) and `runs/<timestamp>/` (Maestro debug output, screenshots, JUnit XML, `run-summary.json`, `report.html`)
-- Skill scripts: `scripts/` in this skill directory. Call them with absolute paths; they take the project via `--project <name>` or `SCOUT_PROJECT`.
+- Target repo (committed, the only repo footprint): `.maestro/flows/*.yaml`, `.maestro/journeys.manifest.json`, `.maestro/qa-review.config.json`
+- Local device (never committed): `~/.qa-review/<project>/` holds `.env` (credentials, user-filled) and `runs/<timestamp>/` (Maestro debug output, screenshots, JUnit XML, `run-summary.json`, `report.html`)
+- Skill scripts: `scripts/` in this skill directory. Call them with absolute paths; they take the project via `--project <name>` or `QA_REVIEW_PROJECT`.
 
-`scout.config.json` (committed, no secrets): `{ "project": "<name>", "platform": "mobile|android|web", "appId" | "url", "buildCmd", "installCmd", "errorCopy": ["..."], "envKeys": ["SCOUT_USER", ...] }`.
+`qa-review.config.json` (committed, no secrets): `{ "project": "<name>", "platform": "mobile|android|web", "appId" | "url", "buildCmd", "installCmd", "errorCopy": ["..."], "envKeys": ["QA_REVIEW_USER", ...] }`.
 
 ## Hard rules (every mode)
 
 1. Token efficiency. Scripts do the driving and the report assembly. After a run, read `run-summary.json` only. Open a screenshot only when its step failed or a mode explicitly flags it. Never page through full filmstrips; the human does that in `report.html`.
-2. Credentials live only in `~/.scout/<project>/.env`. You write placeholder keys, the user fills values. Never read the values back into chat, never put them in flows (flows use `${SCOUT_USER}`-style env refs), never screenshot a password on screen.
-3. Never production. `scripts/guard-env.sh` runs before every suite, on the config target and on every selected flow's own `url:`. A target passes only when a hostname label or bundle-id segment is a dev/staging/test marker; only the user exporting `SCOUT_ALLOW_PROD=1` overrides it. Test or staging accounts only.
+2. Credentials live only in `~/.qa-review/<project>/.env`. You write placeholder keys, the user fills values. Never read the values back into chat, never put them in flows (flows use `${QA_REVIEW_USER}`-style env refs), never screenshot a password on screen.
+3. Never production. `scripts/guard-env.sh` runs before every suite, on the config target and on every selected flow's own `url:`. A target passes only when a hostname label or bundle-id segment is a dev/staging/test marker; only the user exporting `QA_REVIEW_ALLOW_PROD=1` overrides it. Test or staging accounts only.
 4. Fail loud. Never swallow a failing step to keep a run green. A bounded or skipped check is named in the summary so "passed" never quietly means "did not run".
 4b. Carried evidence is labelled, never laundered. A flow that did not run this time still shows its last screenshots. Those count toward green only while they describe the build under test (fingerprinted per run) and are under 7 days old; anything else is shown dimmed and marked as needing a rerun. The header always counts carried separately from verified, so a partial run cannot read as a full pass. No fingerprint means everything carried expires.
-5. Finish with the report. `scout-run.sh` opens `report.html` itself at the end of every run (`SCOUT_NO_OPEN=1` to stop it). Rebuild the report by hand in another mode and you open it by hand: `scripts/open-report.sh <run>/report.html`. The report is the deliverable; your text is a short verdict on top of it.
+5. Finish with the report. `qa-review-run.sh` opens `report.html` itself at the end of every run (`QA_REVIEW_NO_OPEN=1` to stop it). Rebuild the report by hand in another mode and you open it by hand: `scripts/open-report.sh <run>/report.html`. The report is the deliverable; your text is a short verdict on top of it.
 6. Repo hygiene. Nothing generated lands in the target repo except flows, manifest, and config. If a project insists on in-repo output, append `templates/gitignore-snippet` to its `.gitignore` first.
 
 ## Flow-writing rules

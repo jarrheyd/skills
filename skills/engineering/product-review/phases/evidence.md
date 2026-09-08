@@ -15,7 +15,7 @@ From the map, list the screens the review must see. Also note, from code, things
 
 In order of cheapness:
 
-1. qa-review evidence: newest run under `~/.scout/<project>/runs/` whose screenshots cover the mapped screens and post-date the change. Free, already captured.
+1. qa-review evidence: newest run under `~/.qa-review/<project>/runs/` whose screenshots cover the mapped screens and post-date the change. Free, already captured.
 2. Drive the changed screens: web via the browser (navigate, screenshot per screen and per state the intent model names); mobile via Maestro or the simulator tools (install the current build, walk to each screen, capture). Capture the states the expectations name: filled, empty, error, after-success.
 3. No runnable app reachable: code-only mode (below).
 

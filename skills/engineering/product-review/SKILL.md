@@ -44,7 +44,7 @@ MATCHES / DRIFTED / MISSING / EXTRA / CAN'T TELL per expectation; ALIGNED or NEE
 
 ## Relationship to sibling skills
 
-- qa-review (alias scout): drives the app, proves flows work. product-review borrows its freshest screenshots as free evidence.
+- qa-review (alias qa-review): drives the app, proves flows work. product-review borrows its freshest screenshots as free evidence.
 - /code-review: code correctness and quality. Out of scope here.
 - grill-me: the interrogation engine phase 1 uses on the user.
 - deslop: gate every emitted draft through its rules as usual.

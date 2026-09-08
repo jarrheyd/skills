@@ -1,5 +1,5 @@
-# Reusable login sub-flow. Credentials come from ~/.scout/<project>/.env via
-# scout-run.sh (-e SCOUT_USER=... -e SCOUT_PASS=...), never hardcoded.
+# Reusable login sub-flow. Credentials come from ~/.qa-review/<project>/.env via
+# qa-review-run.sh (-e QA_REVIEW_USER=... -e QA_REVIEW_PASS=...), never hardcoded.
 #
 # Only use against dev/staging where login is deterministic (fixed test OTP or
 # a plain password account). The resolver pattern below is state-agnostic:
@@ -42,10 +42,10 @@ appId: com.example.acme.dev
                 commands:
                   - tapOn:
                       id: "login-email-input"
-                  - inputText: ${SCOUT_USER}
+                  - inputText: ${QA_REVIEW_USER}
                   - tapOn:
                       id: "login-password-input"
-                  - inputText: ${SCOUT_PASS}
+                  - inputText: ${QA_REVIEW_PASS}
                   - tapOn: "Continue"
             - waitForAnimationToEnd:
                 timeout: 3000

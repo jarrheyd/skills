@@ -8,7 +8,7 @@ Default: the FULL manifest; regressions land in untouched screens, so pre-deploy
 
 ## 2. Run
 
-`scripts/scout-run.sh --repo <repo>` (add `--flows` for the changed set). Read `run-summary.json`; open only failing flows' last screenshots.
+`scripts/qa-review-run.sh --repo <repo>` (add `--flows` for the changed set). Read `run-summary.json`; open only failing flows' last screenshots.
 
 ## 3. Gap analysis (every audit)
 

@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# scout suite runner. Runs Maestro flows for one project, on mobile (simulator)
-# or web (Chrome), into a fresh run dir under ~/.scout/<project>/runs, then
+# qa-review suite runner. Runs Maestro flows for one project, on mobile (simulator)
+# or web (Chrome), into a fresh run dir under ~/.qa-review/<project>/runs, then
 # builds run-summary.json and report.html and prunes old runs.
 #
 # Usage:
-#   scout-run.sh --repo <path> [--tag smoke] [--flows "a.yaml b.yaml"] [--no-build]
+#   qa-review-run.sh --repo <path> [--tag smoke] [--flows "a.yaml b.yaml"] [--no-build]
 #
-# Reads .maestro/scout.config.json in the repo:
+# Reads .maestro/qa-review.config.json in the repo:
 #   project, platform (mobile|web), appId|url, buildCmd, installCmd, simulator
-# Loads env from ~/.scout/<project>/.env (credentials, injected as maestro -e).
+# Loads env from ~/.qa-review/<project>/.env (credentials, injected as maestro -e).
 #
 # Fail-loud rules: no step swallows its own error; anything bounded or skipped
 # is echoed so "passed" never quietly means "did not run".
@@ -22,21 +22,21 @@ while [ $# -gt 0 ]; do
     --tag) TAG="$2"; shift 2;;
     --flows) FLOWS="$2"; shift 2;;
     --no-build) BUILD_REPORT=0; shift;;
-    *) echo "scout-run: unknown arg $1" >&2; exit 1;;
+    *) echo "qa-review: unknown arg $1" >&2; exit 1;;
   esac
 done
-[ -n "$REPO" ] || { echo "scout-run: --repo <path> required" >&2; exit 1; }
-CONFIG="$REPO/.maestro/scout.config.json"
-[ -f "$CONFIG" ] || { echo "scout-run: $CONFIG missing, run scout setup first" >&2; exit 1; }
+[ -n "$REPO" ] || { echo "qa-review: --repo <path> required" >&2; exit 1; }
+CONFIG="$REPO/.maestro/qa-review.config.json"
+[ -f "$CONFIG" ] || { echo "qa-review: $CONFIG missing, run qa-review setup first" >&2; exit 1; }
 
 jqget() { node -e "const c=require('$CONFIG');process.stdout.write(String(c['$1']??''))"; }
 PROJECT="$(jqget project)"; PLATFORM="$(jqget platform)"
 APP_ID="$(jqget appId)"; URL="$(jqget url)"
 BUILD_CMD="$(jqget buildCmd)"; INSTALL_CMD="$(jqget installCmd)"
 SIMULATOR="$(jqget simulator)"; SIMULATOR="${SIMULATOR:-iPhone 17}"
-[ -n "$PROJECT" ] || { echo "scout-run: config has no project name" >&2; exit 1; }
+[ -n "$PROJECT" ] || { echo "qa-review: config has no project name" >&2; exit 1; }
 
-HOME_DIR="$HOME/.scout/$PROJECT"
+HOME_DIR="$HOME/.qa-review/$PROJECT"
 RUN_DIR="$HOME_DIR/runs/$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$RUN_DIR/debug"
 
@@ -54,13 +54,13 @@ if [ -f "$HOME_DIR/.env" ]; then
     ENV_ARGS+=(-e "$k=$v")
     ENV_COUNT=$((ENV_COUNT + 1))
   done < "$HOME_DIR/.env"
-  echo "scout-run: loaded $ENV_COUNT env vars from $HOME_DIR/.env"
+  echo "qa-review: loaded $ENV_COUNT env vars from $HOME_DIR/.env"
 else
-  echo "scout-run: NOTE no $HOME_DIR/.env found, flows needing credentials will fail"
+  echo "qa-review: NOTE no $HOME_DIR/.env found, flows needing credentials will fail"
 fi
 
 export PATH="$PATH:$HOME/.maestro/bin"
-command -v maestro >/dev/null || { echo "scout-run: maestro not on PATH. Install: curl -fsSL https://get.maestro.mobile.dev | bash" >&2; exit 1; }
+command -v maestro >/dev/null || { echo "qa-review: maestro not on PATH. Install: curl -fsSL https://get.maestro.mobile.dev | bash" >&2; exit 1; }
 # A keg-only Homebrew openjdk is often installed but not on PATH; pick it up.
 if ! java -version >/dev/null 2>&1; then
   for jdk in /opt/homebrew/opt/openjdk/bin /usr/local/opt/openjdk/bin; do
@@ -68,24 +68,24 @@ if ! java -version >/dev/null 2>&1; then
   done
 fi
 if ! java -version >/dev/null 2>&1; then
-  echo "scout-run: no Java runtime; Maestro cannot start. Fix: brew install --cask temurin" >&2
+  echo "qa-review: no Java runtime; Maestro cannot start. Fix: brew install --cask temurin" >&2
   exit 1
 fi
 
 DEVICE_ARGS=()
 if [ "$PLATFORM" = "android" ]; then
   # Android: best-effort. Needs a running emulator or connected device (adb devices).
-  command -v adb >/dev/null || { echo "scout-run: adb not on PATH; install Android platform-tools" >&2; exit 1; }
+  command -v adb >/dev/null || { echo "qa-review: adb not on PATH; install Android platform-tools" >&2; exit 1; }
   SERIAL="$(adb devices | awk 'NR>1 && $2=="device" {print $1; exit}')"
-  [ -n "$SERIAL" ] || { echo "scout-run: no Android device or emulator online (adb devices). Start one and rerun." >&2; exit 1; }
+  [ -n "$SERIAL" ] || { echo "qa-review: no Android device or emulator online (adb devices). Start one and rerun." >&2; exit 1; }
   DEVICE_ARGS=(--device "$SERIAL")
-  if [ -n "$BUILD_CMD" ] && [ "${SCOUT_SKIP_BUILD:-}" != "1" ]; then
-    echo "scout-run: building app ($BUILD_CMD). Set SCOUT_SKIP_BUILD=1 to reuse the installed build."
+  if [ -n "$BUILD_CMD" ] && [ "${QA_REVIEW_SKIP_BUILD:-}" != "1" ]; then
+    echo "qa-review: building app ($BUILD_CMD). Set QA_REVIEW_SKIP_BUILD=1 to reuse the installed build."
     (cd "$REPO" && eval "$BUILD_CMD")
   else
-    echo "scout-run: SKIPPED build step (SCOUT_SKIP_BUILD=1 or no buildCmd); testing the already-installed binary"
+    echo "qa-review: SKIPPED build step (QA_REVIEW_SKIP_BUILD=1 or no buildCmd); testing the already-installed binary"
   fi
-  if [ -n "$INSTALL_CMD" ] && [ "${SCOUT_SKIP_BUILD:-}" != "1" ]; then
+  if [ -n "$INSTALL_CMD" ] && [ "${QA_REVIEW_SKIP_BUILD:-}" != "1" ]; then
     (cd "$REPO" && eval "$INSTALL_CMD")
   fi
 elif [ "$PLATFORM" = "mobile" ]; then
@@ -94,35 +94,35 @@ elif [ "$PLATFORM" = "mobile" ]; then
   if [ -z "$UDID" ]; then
     BOOTED="$(xcrun simctl list devices booted | grep -m1 -oE '[0-9A-F-]{36}' || true)"
     if [ -n "$BOOTED" ]; then
-      echo "scout-run: NOTE using the already-booted simulator $BOOTED, not \"$SIMULATOR\" from scout.config.json"
+      echo "qa-review: NOTE using the already-booted simulator $BOOTED, not \"$SIMULATOR\" from qa-review.config.json"
       UDID="$BOOTED"
     fi
   fi
   if [ -z "$UDID" ]; then
     UDID="$(xcrun simctl list devices available | grep -m1 "$SIMULATOR (" | grep -oE '[0-9A-F-]{36}' || true)"
-    [ -n "$UDID" ] || { echo "scout-run: simulator \"$SIMULATOR\" not found" >&2; exit 1; }
+    [ -n "$UDID" ] || { echo "qa-review: simulator \"$SIMULATOR\" not found" >&2; exit 1; }
     xcrun simctl boot "$UDID"
     xcrun simctl bootstatus "$UDID" -b
   fi
   DEVICE_ARGS=(--device "$UDID")
-  if [ -n "$BUILD_CMD" ] && [ "${SCOUT_SKIP_BUILD:-}" != "1" ]; then
-    echo "scout-run: building app ($BUILD_CMD). Set SCOUT_SKIP_BUILD=1 to reuse the installed build."
+  if [ -n "$BUILD_CMD" ] && [ "${QA_REVIEW_SKIP_BUILD:-}" != "1" ]; then
+    echo "qa-review: building app ($BUILD_CMD). Set QA_REVIEW_SKIP_BUILD=1 to reuse the installed build."
     (cd "$REPO" && eval "$BUILD_CMD")
   else
-    echo "scout-run: SKIPPED build step (SCOUT_SKIP_BUILD=1 or no buildCmd); testing the already-installed binary"
+    echo "qa-review: SKIPPED build step (QA_REVIEW_SKIP_BUILD=1 or no buildCmd); testing the already-installed binary"
   fi
-  if [ -n "$INSTALL_CMD" ] && [ "${SCOUT_SKIP_BUILD:-}" != "1" ]; then
+  if [ -n "$INSTALL_CMD" ] && [ "${QA_REVIEW_SKIP_BUILD:-}" != "1" ]; then
     (cd "$REPO" && eval "$INSTALL_CMD")
   fi
 else
   # Web: Maestro drives its own Chromium. The flows carry url: themselves;
   # nothing to boot here.
-  echo "scout-run: web platform, flows drive Chrome directly"
+  echo "qa-review: web platform, flows drive Chrome directly"
 fi
 
 # Build fingerprint: what was actually under test, so a later report can tell
 # whether evidence it carried forward still describes this build. The installed
-# binary is the honest answer on device: under SCOUT_SKIP_BUILD=1 the commit
+# binary is the honest answer on device: under QA_REVIEW_SKIP_BUILD=1 the commit
 # moves while the binary does not, and a sideloaded build changes the binary
 # while the commit does not. Web has no binary, so the commit is all there is.
 # No fingerprint means carried evidence expires rather than counting green.
@@ -159,9 +159,9 @@ if [ -n "$FINGERPRINT" ]; then
     const [kind,...rest]=process.argv[1].split(' ');
     fs.writeFileSync('$RUN_DIR/build.json', JSON.stringify({kind,hash:rest.join(' '),at:new Date().toISOString()},null,2)+'\n');
   " "$FINGERPRINT"
-  echo "scout-run: build fingerprint ${FINGERPRINT%% *} ${FINGERPRINT##* }"
+  echo "qa-review: build fingerprint ${FINGERPRINT%% *} ${FINGERPRINT##* }"
 else
-  echo "scout-run: NOTE no build fingerprint for platform $PLATFORM; carried evidence will expire instead of counting green"
+  echo "qa-review: NOTE no build fingerprint for platform $PLATFORM; carried evidence will expire instead of counting green"
 fi
 
 # Flow selection in bash (mirrors the production suites): glob flows/*.yaml,
@@ -180,7 +180,7 @@ else
     SELECTED+=("$f")
   done
 fi
-[ ${#SELECTED[@]} -gt 0 ] || { echo "scout-run: no flows selected (tag=$TAG)" >&2; exit 1; }
+[ ${#SELECTED[@]} -gt 0 ] || { echo "qa-review: no flows selected (tag=$TAG)" >&2; exit 1; }
 
 # Web flows carry their own url: header, so guard every selected flow's target too,
 # not only the config value.
@@ -189,7 +189,7 @@ for f in "${SELECTED[@]}"; do
     "$SCRIPT_DIR/guard-env.sh" "$u" >/dev/null
   done
 done
-echo "scout-run: running ${#SELECTED[@]} flow(s): ${SELECTED[*]}"
+echo "qa-review: running ${#SELECTED[@]} flow(s): ${SELECTED[*]}"
 
 # One invocation for the set; per-flow retry for failures. A wedged driver call
 # can hang, so everything runs under a hard timeout.
@@ -200,7 +200,7 @@ run_maestro() { # args: junit-out, flows...
   # macOS ships bash 3.2, where expanding an empty array under set -u errors;
   # the ${arr[@]+...} form is the portable guard.
   local cmd=(maestro ${DEVICE_ARGS[@]+"${DEVICE_ARGS[@]}"} test "$@" ${ENV_ARGS[@]+"${ENV_ARGS[@]}"} --format junit --output "$out" --debug-output "$RUN_DIR/debug")
-  if [ -n "$TIMEOUT_BIN" ]; then "$TIMEOUT_BIN" "${SCOUT_SUITE_TIMEOUT:-3600}" "${cmd[@]}"; else "${cmd[@]}"; fi
+  if [ -n "$TIMEOUT_BIN" ]; then "$TIMEOUT_BIN" "${QA_REVIEW_SUITE_TIMEOUT:-3600}" "${cmd[@]}"; else "${cmd[@]}"; fi
 }
 # Portable per-flow timeout: macOS has no `timeout`; perl's alarm does the job.
 with_timeout() { # secs, cmd...
@@ -209,29 +209,29 @@ with_timeout() { # secs, cmd...
 }
 run_flow() { # args: junit-out, flow
   local out="$1" flow="$2"
-  with_timeout "${SCOUT_FLOW_TIMEOUT:-900}" maestro ${DEVICE_ARGS[@]+"${DEVICE_ARGS[@]}"} test "$flow" ${ENV_ARGS[@]+"${ENV_ARGS[@]}"} --format junit --output "$out" --debug-output "$RUN_DIR/debug"
+  with_timeout "${QA_REVIEW_FLOW_TIMEOUT:-900}" maestro ${DEVICE_ARGS[@]+"${DEVICE_ARGS[@]}"} test "$flow" ${ENV_ARGS[@]+"${ENV_ARGS[@]}"} --format junit --output "$out" --debug-output "$RUN_DIR/debug"
 }
 # Per-flow mode: one maestro invocation per flow. Maestro validates the whole
 # workspace before a multi-flow run and aborts everything on a single addMedia
 # path it cannot resolve (0 flows executed); per-flow runs are immune and also
-# isolate a wedged driver to one flow. Default on; SCOUT_PER_FLOW=0 for the
+# isolate a wedged driver to one flow. Default on; QA_REVIEW_PER_FLOW=0 for the
 # single-invocation mode.
-PER_FLOW="${SCOUT_PER_FLOW:-1}"
+PER_FLOW="${QA_REVIEW_PER_FLOW:-1}"
 set +e
 if [ "$PER_FLOW" = "1" ]; then
   SUITE_RC=0
   FAILED_LIST=""
   for f in "${SELECTED[@]}"; do
     name="$(basename "${f%.yaml}")"
-    echo "scout-run: [$name] running"
+    echo "qa-review: [$name] running"
     run_flow "$RUN_DIR/result-$name.xml" "$f"
     rc=$?
-    if [ $rc -ne 0 ]; then SUITE_RC=1; FAILED_LIST="$FAILED_LIST $name"; echo "scout-run: [$name] FAILED (rc=$rc)"; else echo "scout-run: [$name] passed"; fi
+    if [ $rc -ne 0 ]; then SUITE_RC=1; FAILED_LIST="$FAILED_LIST $name"; echo "qa-review: [$name] FAILED (rc=$rc)"; else echo "qa-review: [$name] passed"; fi
   done
-  if [ -n "$FAILED_LIST" ] && [ "${SCOUT_NO_RETRY:-}" != "1" ]; then
-    echo "scout-run: retrying failed flows once:$FAILED_LIST"
+  if [ -n "$FAILED_LIST" ] && [ "${QA_REVIEW_NO_RETRY:-}" != "1" ]; then
+    echo "qa-review: retrying failed flows once:$FAILED_LIST"
     for name in $FAILED_LIST; do
-      run_flow "$RUN_DIR/result-retry-$name.xml" "flows/$name.yaml" && echo "scout-run: [$name] passed on retry" || echo "scout-run: [$name] failed again"
+      run_flow "$RUN_DIR/result-retry-$name.xml" "flows/$name.yaml" && echo "qa-review: [$name] passed on retry" || echo "qa-review: [$name] failed again"
     done
   fi
 else
@@ -240,8 +240,8 @@ else
 fi
 set -e
 
-if [ "$PER_FLOW" != "1" ] && [ $SUITE_RC -ne 0 ] && [ "${SCOUT_NO_RETRY:-}" != "1" ]; then
-  echo "scout-run: suite had failures (rc=$SUITE_RC), retrying failed flows once"
+if [ "$PER_FLOW" != "1" ] && [ $SUITE_RC -ne 0 ] && [ "${QA_REVIEW_NO_RETRY:-}" != "1" ]; then
+  echo "qa-review: suite had failures (rc=$SUITE_RC), retrying failed flows once"
   FAILED=$(node -e "
     const fs=require('fs');
     const xml=fs.existsSync('$RESULT')?fs.readFileSync('$RESULT','utf8'):'';
@@ -278,12 +278,12 @@ if [ "$BUILD_REPORT" = "1" ]; then
     ${PREV:+--previous "$PREV"}
 fi
 
-node "$SCRIPT_DIR/prune-runs.mjs" --project "$PROJECT" --keep "${SCOUT_KEEP_RUNS:-2}"
+node "$SCRIPT_DIR/prune-runs.mjs" --project "$PROJECT" --keep "${QA_REVIEW_KEEP_RUNS:-2}"
 
 # The report is the deliverable, so the runner opens it instead of leaving that
-# to whoever called the runner. SCOUT_NO_OPEN=1 to keep it closed.
+# to whoever called the runner. QA_REVIEW_NO_OPEN=1 to keep it closed.
 if [ "$BUILD_REPORT" = "1" ]; then
   "$SCRIPT_DIR/open-report.sh" "$RUN_DIR/report.html"
 fi
 
-echo "scout-run: done. Summary: $RUN_DIR/run-summary.json Report: $RUN_DIR/report.html"
+echo "qa-review: done. Summary: $RUN_DIR/run-summary.json Report: $RUN_DIR/report.html"

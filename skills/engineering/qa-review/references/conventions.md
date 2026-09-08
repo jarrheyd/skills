@@ -24,7 +24,7 @@ Distilled from production Maestro suites that gate real releases. Follow these f
 ## Error detection
 
 - After every screen: `assertNotVisible` with the app's LITERAL error-state copy (grep the error components for the exact strings). Asserting a title is visible is not enough; titles render even when the content below them failed.
-- Keep `errorCopy` in `scout.config.json` as the single list, and reuse it in every flow.
+- Keep `errorCopy` in `qa-review.config.json` as the single list, and reuse it in every flow.
 
 ## Resilience without lying
 

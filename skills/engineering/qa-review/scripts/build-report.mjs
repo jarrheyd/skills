@@ -1,17 +1,17 @@
 #!/usr/bin/env node
-// scout report builder. Deterministic and dependency-free: pairs the manifest
+// qa-review report builder. Deterministic and dependency-free: pairs the manifest
 // copy with the screenshots Maestro captured per step and the JUnit pass/fail,
 // and emits ONE self-contained HTML page. Zero AI tokens per build.
 //
-// "Last reviewed" is persisted per journey in ~/.scout/<project>/.report-state.json
+// "Last reviewed" is persisted per journey in ~/.qa-review/<project>/.report-state.json
 // and only bumped for journeys that actually ran this time, so a partial run
 // leaves the others showing their older, honest date.
 //
 //   node build-report.mjs \
-//     --project  <name>                      (resolves ~/.scout/<name>/ paths)
+//     --project  <name>                      (resolves ~/.qa-review/<name>/ paths)
 //     --manifest <journeys.manifest.json>
-//     --config   <scout.config.json>         (platform: mobile|web, errorCopy...)
-//     --debug    <maestro debug output dir>  (default: newest run under ~/.scout/<name>/runs)
+//     --config   <qa-review.config.json>         (platform: mobile|web, errorCopy...)
+//     --debug    <maestro debug output dir>  (default: newest run under ~/.qa-review/<name>/runs)
 //     --junit    <result.xml[,result2.xml]>  (pass/fail per flow; authoritative)
 //     --out      <report.html>               (default: <run>/report.html)
 //     --state    <.report-state.json>
@@ -33,8 +33,8 @@ const args = Object.fromEntries(
 );
 const die = (m) => { console.error(`build-report: ${m}`); process.exit(1); };
 
-const project = args.project || process.env.SCOUT_PROJECT;
-const home = project ? path.join(os.homedir(), '.scout', project) : null;
+const project = args.project || process.env.QA_REVIEW_PROJECT;
+const home = project ? path.join(os.homedir(), '.qa-review', project) : null;
 if (!args.manifest) die('--manifest is required');
 const manifest = JSON.parse(fs.readFileSync(args.manifest, 'utf8'));
 const config = args.config && fs.existsSync(args.config) ? JSON.parse(fs.readFileSync(args.config, 'utf8')) : {};
@@ -61,8 +61,8 @@ function runDirsUnder(dir) {
   const runs = looksLikeRun ? [dir] : kids;
   return runs.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
 }
-// A scout run dir holds debug/ (Maestro debug output with per-flow subdirs).
-function scoutRunDirs(base) {
+// A qa-review run dir holds debug/ (Maestro debug output with per-flow subdirs).
+function qaReviewRunDirs(base) {
   if (!base || !fs.existsSync(base)) return [];
   return fs.readdirSync(base)
     .map((d) => path.join(base, d))
@@ -70,7 +70,7 @@ function scoutRunDirs(base) {
     .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)
     .flatMap((run) => runDirsUnder(fs.existsSync(path.join(run, 'debug')) ? path.join(run, 'debug') : run));
 }
-const runDirs = args.debug ? runDirsUnder(args.debug) : (home ? scoutRunDirs(path.join(home, 'runs')) : []);
+const runDirs = args.debug ? runDirsUnder(args.debug) : (home ? qaReviewRunDirs(path.join(home, 'runs')) : []);
 if (!runDirs.length) console.error('build-report: warning, no run directories found');
 
 const statePath = args.state || (home ? path.join(home, '.report-state.json') : null);
@@ -103,7 +103,7 @@ function junitStatus() {
 const retried = new Set();
 const status = junitStatus();
 
-// What was under test this run, written by scout-run.sh. Null when the runner
+// What was under test this run, written by qa-review-run.sh. Null when the runner
 // could not fingerprint the build; carried evidence then always expires, so an
 // unknown build never counts as green.
 const currentBuild = (() => {

@@ -1,10 +1,10 @@
 # <What this flow guards and why, in one or two sentences. Name the bug class
 # it would catch. This comment is the flow's documentation.>
 #
-# Run:  maestro test .maestro/flows/<name>.yaml -e SCOUT_USER=...
+# Run:  maestro test .maestro/flows/<name>.yaml -e QA_REVIEW_USER=...
 appId: com.example.acme.dev   # web flows: delete appId, start with - launchApp / url in the first step
 tags:
-  - critical   # run-tier tags: critical | happy | all | smoke (grep-matched by scout-run.sh)
+  - critical   # run-tier tags: critical | happy | all | smoke (grep-matched by qa-review-run.sh)
   - smoke
 ---
 - runFlow: _login.yaml

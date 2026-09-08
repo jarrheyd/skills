@@ -24,11 +24,11 @@ Older Maestro versions use `- openLink: https://staging.example.com` as the firs
 
 ## Behavior differences
 
-- No simulator boot, no build step: `scout-run.sh` skips both on `platform: web`. The build happens in the project's own deploy/preview pipeline; scout tests the running URL.
+- No simulator boot, no build step: `qa-review-run.sh` skips both on `platform: web`. The build happens in the project's own deploy/preview pipeline; qa-review tests the running URL.
 - Viewport is Maestro's default desktop size. Responsive/mobile-web checks need a separate pass and are out of scope for the default suite.
 - `launchApp` reloads the page and clears the session only when the flow asks (`clearState`). Login sessions otherwise persist across flows in a suite, same fast-path pattern as mobile.
 - File pickers, browser dialogs (print, native alerts) and third-party auth popups are unreliable to drive; design flows to avoid them or mark the case BLOCKED with the reason.
-- Screenshots are full-viewport PNGs (landscape). The report renders them in browser frames automatically (`platform: web` in scout.config.json).
+- Screenshots are full-viewport PNGs (landscape). The report renders them in browser frames automatically (`platform: web` in qa-review.config.json).
 
 ## Environments
 

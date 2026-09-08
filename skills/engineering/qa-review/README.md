@@ -14,11 +14,11 @@ Maestro does the driving (iOS simulator, Android emulator, or Chrome for web). P
 
 ## Where things go
 
-- Committed to your repo: `.maestro/flows/*.yaml`, `journeys.manifest.json`, `scout.config.json`. A few KB; the flows are team assets.
-- Your machine only: `~/.scout/<project>/` with your `.env` (test credentials, you fill it) and `runs/` (screenshots, JUnit, `report.html`). The last 2 runs are kept, older ones auto-pruned.
+- Committed to your repo: `.maestro/flows/*.yaml`, `journeys.manifest.json`, `qa-review.config.json`. A few KB; the flows are team assets.
+- Your machine only: `~/.qa-review/<project>/` with your `.env` (test credentials, you fill it) and `runs/` (screenshots, JUnit, `report.html`). The last 2 runs are kept, older ones auto-pruned.
 - Never: screenshots or reports in the repo, credentials anywhere but your `.env`, runs against production (the guard refuses any target whose hostname labels or bundle-id segments carry no dev/staging/test marker, and checks every flow's own `url:` too).
 
-Note: `buildCmd` and `installCmd` in the committed `scout.config.json` are executed by the runner. Treat that file like a build script: review changes to it in code review.
+Note: `buildCmd` and `installCmd` in the committed `qa-review.config.json` are executed by the runner. Treat that file like a build script: review changes to it in code review.
 
 ## Install
 
@@ -35,7 +35,7 @@ Or as editable files through skills.sh:
 npx skills@latest add jarrheyd/skills --skill=qa-review
 ```
 
-Claude Code picks it up as `/qa-review`. Saying "scout" still triggers it: that was the original name, and the internal names stay put so projects onboarded under it keep working (`scout.config.json`, `scout-run.sh`, `SCOUT_*` env vars, the `~/.scout/` evidence root). For other agents, point them at `SKILL.md`; everything is plain markdown and scripts.
+Claude Code picks it up as `/qa-review`. One name throughout: `qa-review.config.json`, `qa-review-run.sh`, `QA_REVIEW_*` env vars, and `~/.qa-review/` as the evidence root. A project onboarded before this rename needs those four renamed; `MIGRATING.md` has the commands. For other agents, point them at `SKILL.md`; everything is plain markdown and scripts.
 
 Prerequisites:
 
@@ -52,7 +52,7 @@ iOS projects need Xcode with a simulator. Android needs `adb` on PATH and a runn
 cd your-app
 claude
 > /qa-review setup
-# answer the env questions, fill ~/.scout/<project>/.env with test creds
+# answer the env questions, fill ~/.qa-review/<project>/.env with test creds
 > /qa-review audit
 # open the report, greenlight or not
 ```

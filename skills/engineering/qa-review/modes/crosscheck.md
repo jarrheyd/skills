@@ -14,11 +14,11 @@ For each case, in order of preference: an existing committed flow already covers
 
 ## 3. Run
 
-`scripts/scout-run.sh --repo <repo> --flows "<the mapped flows>"`. Missing creds or env: those cases become BLOCKED, the rest still run.
+`scripts/qa-review-run.sh --repo <repo> --flows "<the mapped flows>"`. Missing creds or env: those cases become BLOCKED, the rest still run.
 
 ## 4. Verdicts
 
-Read `run-summary.json`. Open screenshots only where needed to decide between FAIL / SCRIPT WRONG / NOT WIRED (a JUnit failure alone cannot tell you which; the screenshot can). Write `~/.scout/<project>/runs/<run>/crosscheck.json`:
+Read `run-summary.json`. Open screenshots only where needed to decide between FAIL / SCRIPT WRONG / NOT WIRED (a JUnit failure alone cannot tell you which; the screenshot can). Write `~/.qa-review/<project>/runs/<run>/crosscheck.json`:
 
 ```json
 { "source": "<sheet name>", "cases": [{ "id", "title", "verdict", "note", "evidence" }], "scriptReview": ["..."] }
@@ -36,7 +36,7 @@ Rebuild with the crosscheck section:
 
 ```
 node scripts/build-report.mjs --project <p> --manifest <repo>/.maestro/journeys.manifest.json \
-  --config <repo>/.maestro/scout.config.json --debug <run>/debug --junit <run>/result.xml \
+  --config <repo>/.maestro/qa-review.config.json --debug <run>/debug --junit <run>/result.xml \
   --out <run>/report.html --crosscheck <run>/crosscheck.json --build "crosscheck <sheet> <date>"
 ```
 

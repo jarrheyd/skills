@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// Writes run-summary.json for a scout run: per-flow status, failing step,
+// Writes run-summary.json for a qa-review run: per-flow status, failing step,
 // failing-step screenshot path, timings. This file is the ONLY thing the AI
 // reads after a run; the human reads report.html.
 //
 //   node summarize-run.mjs --run <runDir> [--junit result.xml,result2.xml]
 //
-// runDir layout (created by scout-run.sh):
+// runDir layout (created by qa-review-run.sh):
 //   <runDir>/debug/<timestamp>/<flow>/...   Maestro debug output
 //   <runDir>/result*.xml                    JUnit files (default junit source)
 import fs from 'node:fs';
