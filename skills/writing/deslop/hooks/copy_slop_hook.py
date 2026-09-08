@@ -63,6 +63,10 @@ BANNED_PHRASES = [
     # The "Not X, but Y" family
     (r"(?i)(?:it'?s|this\s+is)\s+not\s+just\s+\w+[^.]{0,40}\.\s*(?:it'?s|this\s+is)\s+", "banned pattern: 'It's not just X. It's Y.' - the #1 AI tell. Rewrite as a direct statement"),
     (r"(?i)not\s+just\s+about\s+\w+[^-]*\s*-\s*it'?s\s+about", "banned pattern: 'not just about X - it's about Y' - AI reframe structure"),
+    # 'not only X but also Y' - flagged by The Economist's 2026 study as a device
+    # the models reach for. Needs both halves inside one sentence, so plain "not
+    # only" on its own passes.
+    (r"(?i)\bnot\s+only\s+[^.!?\n]{1,60}?\bbut\s+also\b", "banned pattern: 'not only X but also Y' - an AI cadence; make the two points as two plain statements, or drop the frame"),
 
     # Aspirational fluff
     (r"(?i)unlock\s+the\s+(?:power|potential)\s+of", "banned phrase: 'unlock the power/potential of' - say what it does"),

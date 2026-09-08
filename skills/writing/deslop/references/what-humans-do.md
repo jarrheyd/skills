@@ -36,6 +36,12 @@ This: "We tried three approaches. Two were slow. The third worked."
 ### Voice Leaks
 The moments where personality breaks through despite the format. A dry aside in documentation. A self-deprecating note in a changelog. Humor that's specific to the team's experience.
 
+### Punctuation Humans Reach For
+The 2026 Economist study found the machine tell is what the writing skips. LLMs use fewer commas and semicolons than people and almost no parentheses. So use them. An aside in parentheses (like this) reads as a human choosing to say one more thing. A semicolon joining two related clauses is a human deciding they belong together. AI writes long, evenly-punctuated sentences; a short one dropped after a long one breaks the machine rhythm.
+
+### Quote a Real Person
+Much of what makes AI prose feel airless is that it names no one. It never quotes a source, because it was not in the room. Human writing points at people: "Drew said the dev branch was outdated." "Sree wants the gold tint only when Kapwa is talking to you." A named voice with an actual sentence is the hardest tell for a model to fake.
+
 ## Design That Feels Human
 
 ### Intentional Imperfection

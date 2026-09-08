@@ -28,7 +28,7 @@ Manual: `/deslop` or "run a slop check on this". For a full review use `agents/s
 Every pattern is a regex in `copy_slop_hook.py`; the literal list, with fixes, is `references/copy-slop-dictionary.md`. By family:
 
 - Throat-clearing openers and filler transitions at the start of a line.
-- The not-just-X reframe and its cousins: negation ladders, either-or reductions, rhetorical-question pile-ups.
+- The not-just-X reframe and its cousins: the not-only-X-but-also-Y frame, negation ladders, either-or reductions, rhetorical-question pile-ups.
 - Aspirational verbs (unlocking, harnessing, elevating, seamless anything, the revolution verb in every tense).
 - Sycophancy, manufactured-candor openers, TikTok aphorisms, chatbot outros.
 - Vague attribution (unnamed studies, experts, critics), puffery about legacies and pivotal moments, dead metaphors about needles, levers, and missing pieces.

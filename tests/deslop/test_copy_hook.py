@@ -30,6 +30,7 @@ BLOCKS = [
     ("question pile-up", "Top? Bottom? Both ends?"),
     ("negation ladder", "Not 95. Not 98. Fifty for fifty."),
     ("either-or", "Either it matches or it doesn't."),
+    ("not only but also", "The build not only compiles but also passes every test."),
     ("hyphen title", "the-thing-that-quietly-broke story"),
     ("triple adjective", "It was specific, careful, deliberate."),
     ("studies show", "Studies show this works."),
@@ -86,6 +87,7 @@ PASSES = [
     ("varied sentences", "We ship Monday. Testing runs Tuesday and Wednesday, with a fix window after. Review is Thursday."),
     ("three items with reason", "The three blockers are certificates, the missing OTP fixture, and the flaky login flow."),
     ("need with reason", "You need a staging account before the suite can log in."),
+    ("not only alone", "Not only did the login fail. The signup crashed too."),
     ("emoji inside text", "Shipped the invite flow today 🎉 and the tests are green."),
 ]
 

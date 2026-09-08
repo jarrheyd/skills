@@ -31,6 +31,7 @@ The single most recognized AI pattern. Ban entirely.
 - "It's not just about X — it's about Y."
 - "X isn't just Y. It's Z."
 - "This isn't just a tool. It's a revolution."
+- "not only X but also Y" — a device The Economist's 2026 study found the models reach for, alongside "not X but Y" and the rule of three. Make the two points as two plain statements, or drop the frame. Blocked only when both halves sit in one sentence, so a bare "not only that" passes.
 - Any reframe where the second clause inflates the first
 
 ### Aspirational Fluff
@@ -212,6 +213,8 @@ Not AI tells on their own but become tells in combination or at high frequency.
 
 **Phrases**: "moving forward," "at the end of the day," "when it comes to," "in terms of," "the fact that"
 
+**Long words for short ones**: maximise/maximize (for "make the most of"), utilise, commence, endeavour, facilitate, leverage (as a verb). The 2026 Economist study found the models slip into polysyllabic or scientific vocabulary where a plain word would do. Not banned; flag at density and prefer the shorter word.
+
 ## Era-Specific Vocabulary (What's Hot Now)
 
 AI vocabulary shifts as models are retrained and post-processing filters evolve.
@@ -223,6 +226,15 @@ AI vocabulary shifts as models are retrained and post-processing filters evolve.
 | Late 2025-2026 | "emphasizing," "enhance," "highlighting," "showcasing" — "delve" dropped sharply |
 
 **Why this matters**: If your copy uses the current era's AI vocabulary at density, it reads as freshly generated. Update your awareness as models shift.
+
+## Punctuation and structure (2026 Economist study)
+
+The Economist compared 1.2m words of LLM output (ChatGPT, Claude, Gemini, Grok) against journalism and novels. The 2026 tells turned out to be less about which words appear and more about what the writing lacks. These are absence patterns, so the hook cannot block them; catch them by reading.
+
+- **Em dashes are no longer a reliable tell.** After recent model updates only Claude uses more em dashes than human writers; ChatGPT uses markedly fewer. deslop still blocks the em dash, but as a house style rule, not because a dash proves a machine wrote it. Do not treat a document's em dashes as evidence either way.
+- **AI underuses commas and semicolons**, and uses almost no parentheses. Human writers reach for all three. An aside in parentheses or a semicolon joining two related clauses reads as human.
+- **AI writes long sentences and rarely breaks a paragraph with a short one.** Vary the length. Let a three-word sentence land after a long one.
+- **AI does not quote people.** Real reporting names a source and quotes them; that alone accounts for much of the missing punctuation. If the piece should have a voice in it, put one in.
 
 ## Structural Tells
 
