@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.0.0
+
+### Major Changes
+
+- [`564809d`](https://github.com/jarrheyd/skills/commit/564809dc541deb04e4b8241442eb58ae2af83486) Thanks [@jarrheyd](https://github.com/jarrheyd)! - qa-review drops the scout name. The runner is now qa-review-run.sh, the config is qa-review.config.json, control variables take the QA*REVIEW* prefix, and evidence lives in ~/.qa-review. No fallback to the old names: a project onboarded earlier must migrate all four, and MIGRATING.md has the commands. The scout alias is gone from the skill description.
+
+### Minor Changes
+
+- [`37219a5`](https://github.com/jarrheyd/skills/commit/37219a52e8e2a07fa47a8e4419ab79f45389b795) Thanks [@jarrheyd](https://github.com/jarrheyd)! - qa-review carries the previous run forward. A flow that did not run this time now shows its last screenshots instead of an empty card, and counts toward green only while that evidence still describes the build under test and is under 7 days old. Each run fingerprints what was installed (the simulator or device binary, or the commit for web), so evidence survives SKIP_BUILD reruns but expires the moment the binary changes. Expired evidence still shows, dimmed, with the reason and its original date. The header now counts verified, carried, needing a rerun and never run separately, so a partial run cannot read as a full pass. Fixes the off-by-one that made the existing carry-forward pick a report two runs back, which pruning had usually deleted, so nothing was ever carried.
+
+### Patch Changes
+
+- [`938742c`](https://github.com/jarrheyd/skills/commit/938742cad177d76121ec9c7284fa706f3b2aeb51) Thanks [@jarrheyd](https://github.com/jarrheyd)! - qa-review opens the report from the runner. scout-run.sh now calls a new open-report.sh at the end of every run, so a finished run always puts report.html on screen instead of relying on the agent to remember the step. SCOUT_NO_OPEN=1 or CI keeps it closed, SCOUT_OPEN_CMD overrides the opener.
+
 ## 1.1.0
 
 ### Minor Changes
