@@ -32,7 +32,7 @@ node scripts/build-report.mjs --project <p> --manifest ... --config ... --debug 
   [--product <run>/product-notes.json] --build "pre-deploy audit <date>"
 ```
 
-Open it. Then the verdict, first line, one of:
+This rebuild replaces the one the runner made, so open it again: `scripts/open-report.sh <run>/report.html`. Then the verdict, first line, one of:
 
 - GREENLIGHT: all flows green, no blocking product findings. Gaps listed as future work.
 - NO-GO: name each failing flow and blocking finding. What must change, nothing else.

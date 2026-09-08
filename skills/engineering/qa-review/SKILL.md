@@ -37,7 +37,7 @@ Read ONLY the mode file for the invoked mode. If no mode is named, ask which one
 2. Credentials live only in `~/.scout/<project>/.env`. You write placeholder keys, the user fills values. Never read the values back into chat, never put them in flows (flows use `${SCOUT_USER}`-style env refs), never screenshot a password on screen.
 3. Never production. `scripts/guard-env.sh` runs before every suite, on the config target and on every selected flow's own `url:`. A target passes only when a hostname label or bundle-id segment is a dev/staging/test marker; only the user exporting `SCOUT_ALLOW_PROD=1` overrides it. Test or staging accounts only.
 4. Fail loud. Never swallow a failing step to keep a run green. A bounded or skipped check is named in the summary so "passed" never quietly means "did not run".
-5. Finish with the report. Every run ends by opening `report.html` for the human (`open` on macOS, `xdg-open` on Linux). The report is the deliverable; your text is a short verdict on top of it.
+5. Finish with the report. `scout-run.sh` opens `report.html` itself at the end of every run (`SCOUT_NO_OPEN=1` to stop it). Rebuild the report by hand in another mode and you open it by hand: `scripts/open-report.sh <run>/report.html`. The report is the deliverable; your text is a short verdict on top of it.
 6. Repo hygiene. Nothing generated lands in the target repo except flows, manifest, and config. If a project insists on in-repo output, append `templates/gitignore-snippet` to its `.gitignore` first.
 
 ## Flow-writing rules

@@ -231,4 +231,11 @@ if [ "$BUILD_REPORT" = "1" ]; then
 fi
 
 node "$SCRIPT_DIR/prune-runs.mjs" --project "$PROJECT" --keep "${SCOUT_KEEP_RUNS:-2}"
+
+# The report is the deliverable, so the runner opens it instead of leaving that
+# to whoever called the runner. SCOUT_NO_OPEN=1 to keep it closed.
+if [ "$BUILD_REPORT" = "1" ]; then
+  "$SCRIPT_DIR/open-report.sh" "$RUN_DIR/report.html"
+fi
+
 echo "scout-run: done. Summary: $RUN_DIR/run-summary.json Report: $RUN_DIR/report.html"

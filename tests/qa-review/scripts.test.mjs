@@ -80,6 +80,38 @@ test('guard-env refuses substring matches and allows real markers', () => {
   assert.equal(spawnSync('bash', [guard]).status, 1);
 });
 
+test('open-report opens the report, and says so when it cannot', () => {
+  const opener = path.join(S, 'open-report.sh');
+  const d = tmp();
+  const built = path.join(d, 'report.html');
+  fs.writeFileSync(built, '<html></html>');
+  const marker = path.join(d, 'opened.txt');
+  const fake = path.join(d, 'fake-open.sh');
+  fs.writeFileSync(fake, `#!/usr/bin/env bash\necho "$1" > ${marker}\n`);
+  fs.chmodSync(fake, 0o755);
+  const env = { ...process.env, SCOUT_OPEN_CMD: fake, CI: '' };
+
+  const ok = spawnSync('bash', [opener, built], { env, encoding: 'utf8' });
+  assert.equal(ok.status, 0);
+  assert.equal(fs.readFileSync(marker, 'utf8').trim(), built);
+
+  fs.rmSync(marker);
+  const off = spawnSync('bash', [opener, built], { env: { ...env, SCOUT_NO_OPEN: '1' }, encoding: 'utf8' });
+  assert.equal(off.status, 0);
+  assert.equal(fs.existsSync(marker), false);
+  assert.match(off.stdout, /SKIPPED/);
+
+  const missing = spawnSync('bash', [opener, path.join(d, 'gone.html')], { env, encoding: 'utf8' });
+  assert.equal(missing.status, 0);
+  assert.match(missing.stderr, /no report at/);
+  assert.equal(spawnSync('bash', [opener], { env }).status, 1);
+});
+
+test('scout-run opens the report it built', () => {
+  const runner = fs.readFileSync(path.join(S, 'scout-run.sh'), 'utf8');
+  assert.match(runner, /open-report\.sh" "\$RUN_DIR\/report\.html"/);
+});
+
 test('prune-runs keeps the newest N', () => {
   const home = tmp();
   const runs = path.join(home, '.scout', 'proj', 'runs');
