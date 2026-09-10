@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.0
+
+### Minor Changes
+
+- [`f9da7ec`](https://github.com/jarrheyd/skills/commit/f9da7ec575ad4cbd52d9e1c7150465945a0882ef) Thanks [@jarrheyd](https://github.com/jarrheyd)! - deslop learns from the 2026 Economist study on spotting AI writing. The copy hook now blocks "not only X but also Y" when both halves sit in one sentence, alongside the "not X but Y" family it already caught. The dictionary records the study's real finding: the modern tells are what AI leaves out, so a note explains that em dashes are no longer a reliable AI fingerprint (only Claude overuses them) and stay blocked as house style, not as evidence, and what-humans-do.md gains two counter-patterns, the punctuation people reach for that AI skips (commas, semicolons, parentheses, a short sentence after a long one) and quoting a real named person. "maximise" and its long-word cousins join the density-flagged list.
+
+- [`045cf6c`](https://github.com/jarrheyd/skills/commit/045cf6c3a019e6fd70831ca9072ed8c11e6238a2) Thanks [@jarrheyd](https://github.com/jarrheyd)! - deslop now catches the absence tells, the things AI leaves out per the 2026 Economist study, in the review path. A new scripts/flat_prose.py reads flowing prose over ~150 words (lists, code, tables and headings stripped first) and prints one plain nudge when several signals agree the prose is flat: long even sentences, no semicolons, no parenthetical asides. It never blocks (exit 0 always) and never prints numbers, so it stays out of the zero-tolerance write hooks where a bullet list or commit message would trip it. The slop-detector agent runs it in its density pass, and SKILL.md documents it as review-only.
+
 ## 2.0.0
 
 ### Major Changes
