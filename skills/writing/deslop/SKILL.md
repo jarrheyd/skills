@@ -80,6 +80,12 @@ Before presenting a feature, a document, a design, copy, or UI:
 4. Client-facing, published, or written in someone's voice: run the slop-detector agent.
 5. Fix what it finds, then present. Never present with a "might be sloppy" caveat.
 
+## Airless prose (review-only)
+
+The 2026 Economist study found the modern machine tell is what AI leaves out: long, evenly-punctuated sentences with almost no semicolons or parenthetical asides, and paragraphs never broken by a short line. That cannot be a hook. The write gates are zero-tolerance, and a bullet list or a commit message lacks all of it by design, so a block would fire on writing that is fine. So it runs in review, never as a gate.
+
+`scripts/flat_prose.py` reads a file or stdin, strips lists, code, tables and headings, and on flowing prose over ~150 words prints one plain nudge when several signals agree the prose is flat. It never blocks (exit 0 always) and never prints numbers. The slop-detector agent runs it in its density pass; run it yourself over any substantial prose block before presenting.
+
 ## The five questions
 
 1. Would AI generate this by default? If yes, question every element.
@@ -93,7 +99,7 @@ Before presenting a feature, a document, a design, copy, or UI:
 - Specific beats generic. Real names, real numbers, real failures, real tools.
 - Intentional beats default. If "why this?" is answered by "that is how it is usually done", it is slop.
 - Rough edges signal a person. Asymmetry, an unexpected exact word, a fragment. Do not sand every edge.
-- Vary rhythm. Short sentence, then one that takes its time, then short again.
+- Vary rhythm. Short sentence, then one that takes its time, then short again. `scripts/flat_prose.py` checks this in review.
 - Earn every element. Delete any paragraph, visual, or section whose removal loses nothing.
 - Show receipts: real data, real screenshots, real process.
 - Removing slop is half the job. A clean draft with no voice is its own tell; add stance and specificity, never new claims.
@@ -105,6 +111,7 @@ Before presenting a feature, a document, a design, copy, or UI:
 | `hooks/copy_slop_hook.py` | Copy gate |
 | `hooks/design_slop_hook.py` | Visual gate |
 | `hooks/artifact_slop_hook.py` | Artifact and Drive connector gate |
+| `scripts/flat_prose.py` | Review-only advisory for airless prose (the absence tells); never blocks |
 | `references/copy-slop-dictionary.md` | Full copy catalog, including judgment tells the hook cannot regex |
 | `references/design-slop-patterns.md` | Visual and slide tells |
 | `references/what-humans-do.md` | What to do instead |

@@ -17,6 +17,7 @@ Volume is the tell the word lists miss. A document can contain no banned phrase 
 1. One idea per paragraph, in at most two sentences. Flag any paragraph that takes more than two sentences to land one idea; the extras are usually a restatement, a why-it-matters preface, or a recap of the sentence above.
 2. Restatement by synonym. The hook catches near-verbatim repeats only; the synonym form reuses almost no words, so read for it. If the second sentence adds no new fact, cut it.
 3. Unranked points in an argument. Decide the document kind first. An inventory (sweep, brief, roll-up, ledger) is exhaustive and flat by design; do not flag length there. A thesis document (memo, proposal, decision doc) must make its top three findable on the first screen; if every point sits at the same weight, name the three that carry the decision.
+4. Airless prose, the absence tell from the 2026 Economist study. Pipe the content to `scripts/flat_prose.py` on stdin. If it prints a nudge, the passage runs long and even with no semicolons or asides; report it as a WARNING and point at the flattest stretch. It stays silent on lists, short text, and varied prose, so a nudge is worth acting on.
 
 Report the current word count and the count after the cuts you propose.
 
