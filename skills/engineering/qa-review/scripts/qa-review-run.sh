@@ -15,6 +15,19 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# --- teardown: never leave maestro/JVM children or node orphans behind ---
+# Runs on any exit (success, failure, Ctrl-C, timeout). Terminates this run's own
+# child processes, then sweeps machine-wide node orphans (dead nx daemons, orphaned
+# jest runs, dev servers with no listener) so a qa-review run can't grow the leak.
+# The launchd guard (com.jarrhey.reap-node-leaks) is the backstop for a SIGKILLed session.
+cleanup() {
+  local ec=$?
+  pkill -TERM -P $$ 2>/dev/null || true
+  [ -x "$HOME/.claude/scripts/reap-node-leaks.sh" ] && bash "$HOME/.claude/scripts/reap-node-leaks.sh" >/dev/null 2>&1 || true
+  return $ec
+}
+trap cleanup EXIT INT TERM
 REPO="" TAG="" FLOWS="" BUILD_REPORT=1
 while [ $# -gt 0 ]; do
   case "$1" in

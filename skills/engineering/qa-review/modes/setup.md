@@ -51,6 +51,16 @@ From the templates, adapted to the real code:
 
 Commit `.maestro/` (flows, manifest, config, plus any testIDs added to app code) with the user's normal commit conventions. Open `report.html`. Summarize: flows built, flows planned, testIDs added, what the user still owes (creds, approvals).
 
+## Process hygiene (node-leak guard)
+
+Test and build runs (nx, jest, dev servers) orphan to launchd (ppid=1) when the launching session dies, and pile up in swap until the Mac hits "out of application memory". qa-review-run.sh sweeps these on exit via `~/.claude/scripts/reap-node-leaks.sh`. That backstop should also run on a timer, independent of any session:
+
+```bash
+cp ~/.claude/scripts/com.jarrhey.reap-node-leaks.plist ~/Library/LaunchAgents/ && launchctl load ~/Library/LaunchAgents/com.jarrhey.reap-node-leaks.plist
+```
+
+Runs every 5 min, kills only orphans (dead-parent nx daemons/jest, dev servers with no listener), logs to `~/.claude/scripts/reap.log`. One-off sweep: `bash ~/.claude/scripts/reap-node-leaks.sh`.
+
 ## Blackbox setup (--blackbox: no codebase access)
 
 For when the person has only a running app: a staging URL (web) or an installable build like a TestFlight/apk/.app (mobile). Maestro never needed source to drive; only the exploration changes.
