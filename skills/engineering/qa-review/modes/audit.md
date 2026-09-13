@@ -18,7 +18,9 @@ Compare the code's screen/route map against the manifest:
 - Branches without an unhappy-path flow (validation errors, declined payment, empty states, permission denials)
 - Manifest entries still `planned: true`
 
-Write `<run>/gaps.json`: `{ "items": [{ "area", "kind": "happy|unhappy|edge", "note" }] }`. Propose the top gaps as new flows; on approval, build them, add manifest entries, and they join the next audit. Coverage ratchets up; it never silently shrinks.
+Then a flow-freshness check (rule 8): cross-reference every selector each flow uses against the testIDs present in the current code. A selector with no match is rot, and a rotted flow tests nothing while looking green or red for the wrong reason. Repair rot in this audit, not later.
+
+Write `<run>/gaps.json`: `{ "items": [{ "area", "kind": "happy|unhappy|edge|rot", "note", "flow"?, "selector"? }] }`. Propose the top gaps as new flows; on approval, build them, add manifest entries, and they join the next audit. Coverage ratchets up; it never silently shrinks.
 
 ## 4. Product pass (only with --product)
 
@@ -32,9 +34,9 @@ node scripts/build-report.mjs --project <p> --manifest ... --config ... --debug 
   [--product <run>/product-notes.json] --build "pre-deploy audit <date>"
 ```
 
-This rebuild replaces the one the runner made, so open it again: `scripts/open-report.sh <run>/report.html`. Then the verdict, first line, one of:
+This rebuild replaces the one the runner made, so open it again: `scripts/open-report.sh <run>/report.html`. Present the run as a regression-test-case matrix and classify every red by class, per `references/regression-report.md`: one numbered case per flow with its status and, when not passing, its class (CRASH / DEFECT / FLOW-ROT / ENV) and evidence; a coverage line; and the production-readiness line. Then the verdict, first line, one of:
 
-- GREENLIGHT: all flows green, no blocking product findings. Gaps listed as future work.
-- NO-GO: name each failing flow and blocking finding. What must change, nothing else.
+- GREENLIGHT: all flows pass, no open CRASH or DEFECT, no BLOCKED case hiding an untested critical journey. Gaps and future flows listed as follow-ups.
+- NO-GO: name each open CRASH and DEFECT case and each blocking product finding. What must change, nothing else.
 
-Never greenlight with a red flow "explained away" in prose; fix the flow or the app first, or say NO-GO.
+Never greenlight with a red flow "explained away" in prose. A CRASH or DEFECT is fixed in the app first. A FLOW-ROT is repaired and rerun so the final report has no unclassified reds. An ENV failure is retried, never counted against the app.
