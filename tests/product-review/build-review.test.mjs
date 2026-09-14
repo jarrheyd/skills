@@ -68,3 +68,51 @@ test('rejects items that are not an array and invalid JSON', () => {
   assert.equal(build({ overall: 'ALIGNED', items: 'nope' }).status, 1);
   assert.equal(build('{not json').status, 1);
 });
+
+// Build a review whose shots are real files in the review dir, so b64() can read them.
+function buildWithShots(makeItems) {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'product-review-shots-'));
+  const shot = (name) => {
+    const p = path.join(d, name);
+    // A 1x1 PNG; sips may reject it, build-review falls back to reading raw bytes.
+    fs.writeFileSync(p, Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154789c6360000002000154a24f9f0000000049454e44ae426082', 'hex'));
+    return p;
+  };
+  const review = { feature: 'Shots', target: 'PR #2', overall: 'ALIGNED', items: makeItems(shot), extras: [], bounds: [] };
+  fs.writeFileSync(path.join(d, 'review.json'), JSON.stringify(review));
+  const p = spawnSync('node', [SCRIPT, '--review', path.join(d, 'review.json'), '--out', path.join(d, 'report.html')], { encoding: 'utf8' });
+  const html = fs.existsSync(path.join(d, 'report.html')) ? fs.readFileSync(path.join(d, 'report.html'), 'utf8') : '';
+  return { status: p.status, stderr: p.stderr, html };
+}
+
+test('renders one screenshot per flow, and several from an actuals array', () => {
+  const r = buildWithShots((shot) => [
+    { n: 1, expectation: 'Home shows the card', verdict: 'MATCHES', note: '', flow: 'home', actual: shot('a.png') },
+    { n: 2, expectation: 'Create walks its states', verdict: 'DRIFTED', note: 'off', flow: 'create', actuals: [shot('b.png'), shot('c.png')] },
+  ]);
+  assert.equal(r.status, 0, r.stderr);
+  // 3 embedded images total (1 + 2), each a data URI.
+  assert.equal((r.html.match(/data:image\//g) || []).length, 3);
+  assert.match(r.html, /Flow: <span class="code">home<\/span>/);
+  assert.match(r.html, /What was built \(1\)/);
+  assert.match(r.html, /What was built \(2\)/);
+});
+
+test('a visual item with no screenshot gets a loud placeholder, not silence', () => {
+  const r = buildWithShots(() => [
+    { n: 1, expectation: 'Empty state', verdict: "CAN'T TELL", note: 'never reached' },
+  ]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.html, /class="noshot"/);
+  assert.match(r.html, /No screenshot/);
+});
+
+test('warns when a verified item has no screenshot, and rejects a non-array actuals', () => {
+  const warned = buildWithShots(() => [
+    { n: 1, expectation: 'Button', verdict: 'MATCHES', note: '', code: 'x.tsx:1' },
+  ]);
+  assert.match(warned.stderr, /no screenshot/i);
+  const bad = build({ feature: 'x', overall: 'ALIGNED', items: [{ n: 1, expectation: 'e', verdict: 'MATCHES', note: '', actuals: 'nope' }] });
+  assert.equal(bad.status, 1);
+  assert.match(bad.stderr, /actuals must be an array/);
+});

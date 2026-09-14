@@ -28,8 +28,13 @@ else review.items.forEach((it, i) => {
   if (!it.expectation) problems.push(`items[${i}] has no expectation`);
   if (!VERDICTS.includes(it.verdict)) problems.push(`items[${i}] verdict must be one of ${VERDICTS.join(' | ')}, got ${JSON.stringify(it.verdict)}`);
   if (it.verdict !== 'MATCHES' && it.verdict !== 'EXTRA' && !it.note) problems.push(`items[${i}] (${it.verdict}) needs a note`);
-  if (['MATCHES', 'DRIFTED', 'MISSING'].includes(it.verdict) && !it.actual && !it.code) problems.push(`items[${i}] (${it.verdict}) cites no evidence: set actual (screenshot) or code (file:line)`);
+  const hasShot = it.actual || (Array.isArray(it.actuals) && it.actuals.length);
+  if (['MATCHES', 'DRIFTED', 'MISSING'].includes(it.verdict) && !hasShot && !it.code) problems.push(`items[${i}] (${it.verdict}) cites no evidence: set actual/actuals (screenshot) or code (file:line)`);
+  if (it.actuals != null && !Array.isArray(it.actuals)) problems.push(`items[${i}] actuals must be an array of screenshot paths`);
 });
+// A visual item that reached its screen should carry a screenshot; warn (not fail) so the report still builds.
+const missingShots = (review.items || []).filter((it) => ['MATCHES', 'DRIFTED', 'MISSING'].includes(it.verdict) && !it.actual && !(Array.isArray(it.actuals) && it.actuals.length));
+if (missingShots.length) console.error(`build-review: warning: ${missingShots.length} verified item(s) have no screenshot (code-only). Attach a shot per flow where a screen exists.`);
 for (const k of ['extras', 'bounds']) if (review[k] != null && !Array.isArray(review[k])) problems.push(`${k} must be an array of strings`);
 if (problems.length) { console.error(`build-review: ${args.review} is not a valid review:\n  - ${problems.join('\n  - ')}`); process.exit(1); }
 const baseDir = path.dirname(path.resolve(args.review));
@@ -65,14 +70,27 @@ for (const it of review.items || []) counts[it.verdict] = (counts[it.verdict] ||
 const tally = Object.entries(counts).map(([v, n]) => `${n} ${v.toLowerCase()}`).join(', ');
 const aligned = review.overall === 'ALIGNED';
 
-function pair(it) {
+// Every flow should carry its screenshot. `actual` (one) and `actuals` (many,
+// e.g. the states a flow walks) both render; `expected` sits beside them when a
+// design frame was exported. A visual item with no screenshot renders a loud
+// placeholder rather than silently omitting, so gaps are visible in the report.
+// Only a purely behavioral item (cites `code`, screen not the point) may skip it.
+function evidence(it) {
   const exp = resolveShot(it.expected);
-  const act = resolveShot(it.actual);
-  if (!exp && !act) return '';
-  const fig = (src, label) => src
-    ? `<figure class="shot"><figcaption>${label}</figcaption><img loading="lazy" src="${b64(src)}" alt="${esc(it.expectation)} (${label})" /></figure>`
-    : '';
-  return `<div class="pair">${fig(exp, 'Expected')}${fig(act, 'What was built')}</div>`;
+  const rawActuals = [].concat(it.actuals || [], it.actual ? [it.actual] : []);
+  const acts = [...new Set(rawActuals.map(resolveShot).filter(Boolean))];
+  const fig = (src, label) =>
+    `<figure class="shot"><figcaption>${esc(label)}</figcaption><img loading="lazy" src="${b64(src)}" alt="${esc(it.expectation)} (${esc(label)})" /></figure>`;
+  if (!exp && acts.length === 0) {
+    // Behavioral/code-only expectations legitimately have no screen to show.
+    if (it.code && it.verdict !== "CAN'T TELL") return '';
+    const why = it.verdict === "CAN'T TELL" ? 'the walk could not reach this screen' : 'no screenshot was attached to this flow';
+    return `<div class="pair"><div class="noshot">No screenshot: ${esc(why)}. Add one in evidence to make this flow verifiable.</div></div>`;
+  }
+  const shots = [];
+  if (exp) shots.push(fig(exp, 'Expected'));
+  acts.forEach((src, i) => shots.push(fig(src, acts.length > 1 ? `What was built (${i + 1})` : 'What was built')));
+  return `<div class="pair">${shots.join('')}</div>`;
 }
 
 function itemCard(it) {
@@ -80,8 +98,9 @@ function itemCard(it) {
     <div class="head"><span class="n">${esc(it.n)}</span>
       <h3>${esc(it.expectation)}</h3>
       <span class="verdict ${V[it.verdict] || ''}">${esc(it.verdict)}</span></div>
+    ${it.flow ? `<p class="flow">Flow: <span class="code">${esc(it.flow)}</span></p>` : ''}
     ${it.note ? `<p>${esc(it.note)}${it.code ? ` <span class="code">(${esc(it.code)})</span>` : ''}</p>` : (it.code ? `<p><span class="code">(${esc(it.code)})</span></p>` : '')}
-    ${pair(it)}
+    ${evidence(it)}
   </article>`;
 }
 
@@ -121,6 +140,8 @@ const html = `<!doctype html>
   .shot{flex:none;margin:0;max-width:46%}
   .shot figcaption{font-size:12.5px;color:var(--faint);margin:0 0 6px}
   .shot img{max-width:100%;display:block;border:1px solid var(--line);border-radius:10px;background:#fff}
+  .noshot{flex:none;font-size:13px;color:var(--soft);background:var(--raise);border:1px dashed var(--line);border-radius:10px;padding:14px 16px;max-width:64ch}
+  .flow{margin:2px 0 0!important;font-size:13px}
   .section{margin-top:44px;padding-top:12px;border-top:1px solid var(--line)}
   .section h2{font-size:22px;letter-spacing:-0.01em;margin:16px 0 8px}
   .section ul{margin:0;padding-left:22px;color:var(--soft)}

@@ -34,6 +34,6 @@ Offer the follow-up: once a build or URL exists, rerun phase 2 only. The intent 
 
 ## 3. Pair with expectations
 
-For each intent item, attach: the actual screenshot (or the code location when the expectation is behavioral), and when a Figma frame was exported in phase 1, the expected image alongside it. Items with no evidence found yet go back to step 2 once; still nothing reachable, they are CAN'T TELL.
+Save every flow's screenshots into the review folder (e.g. `<reviewDir>/shots/`), so the report is self-contained and paths stay stable. For each intent item, attach: the actual screenshot in `actual`, or `actuals` for the several states a flow walks (filled, empty, error, after-success), plus `flow` naming the walk. Use the code location instead only when the expectation is purely behavioral. When a Figma frame was exported in phase 1, put it in `expected` to sit beside the built shot. A reachable screen with no screenshot is a gap to close, not a thing to omit: the builder shows a loud placeholder and warns for any visual item missing one. Items with no evidence found yet go back to step 2 once; still nothing reachable, they are CAN'T TELL.
 
 Token discipline: look at each screenshot once, when judging its expectation. The report embeds everything for the human; do not re-open images to describe them.
