@@ -18,10 +18,13 @@ Two hooks run on every Write, Edit and MultiEdit, one on artifacts. Every hit bl
 - `hooks/copy_slop_hook.py` reads prose files (`.md`, `.mdx`, `.txt`, `.html`) and the string literals of `.ts`, `.tsx`, `.js`, `.jsx`, `.py`.
 - `hooks/design_slop_hook.py` reads `.html`, `.css`, `.scss`, `.tsx`, `.jsx`, `.vue`, `.svelte`.
 - `hooks/artifact_slop_hook.py` pulls the body out of an `Artifact` publish or a Drive connector `create_file` / `update_file` and runs both hooks on it. Those writes never touch the local filesystem, so without it they skip the gate.
+- `hooks/copy_slop_hook.py` also gates sends that never touch a file: email drafts and bodies, ticket and wiki comments, and chat-app messages (Discord, Telegram, Teams, iMessage). Chat gets a tells-only subset, since chat voice is lowercase and fragmented and the prose-shape checks misfire on it; email and comments get the full prose set. His named banned words block on the first occurrence here, since the density thresholds never trip on a short message. Wire it on the send tools in `settings.json`.
 
 Bypass a session with `DISABLE_ANTI_SLOP_HOOK=1`. Exempt paths that repeat by design (ledgers, generated output, a vault's state files) with `DESLOP_SKIP_PATHS=_archive/,build/`. Hooks load at session start; a hook added mid-session protects the next session.
 
 Manual: `/deslop` or "run a slop check on this". For a full review use `agents/slop-detector.md`; for a rewrite use `agents/copy-humanizer.md`.
+
+The hook is the floor, never the whole job. A hook cannot see chat replies, and it cannot tell whether a draft sounds like the author. So before anything goes external, sample the author's last sends in the target channel, shape the draft to match, then run the manual review. A draft that clears the hook but does not sound like him still needs the rewrite.
 
 ## What the copy hook blocks
 

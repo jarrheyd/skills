@@ -158,5 +158,49 @@ class CopyHook(unittest.TestCase):
                 self.assertEqual(code, 0, err)
 
 
+def run_send(tool, tool_input):
+    payload = json.dumps({"tool_name": tool, "tool_input": tool_input})
+    p = subprocess.run(["python3", HOOK], input=payload, capture_output=True, text=True)
+    return p.returncode, p.stderr
+
+
+class SendGate(unittest.TestCase):
+    """Email, ticket, and chat sends never touch a file; the hook gates them by payload."""
+
+    def test_chat_blocks_tells(self):
+        self.assertEqual(run_send("mcp__Discord__send_message", {"message": "coming over — will ping"})[0], 2)
+        self.assertEqual(run_send("mcp__discord__discord_send", {"message": "this is a robust solution"})[0], 2)
+
+    def test_chat_allows_his_voice(self):
+        for msg in ("coming. ill add them sa doc hahaha", "yes okay ra",
+                    "few gaps ra. ill add the numbers sa doc later today ok"):
+            with self.subTest(msg):
+                self.assertEqual(run_send("mcp__Telegram__send_message", {"message": msg})[0], 0)
+
+    def test_chat_skips_prose_shape_checks(self):
+        # Four uniform short sentences trip the prose uniform-sentence check; chat must not run it.
+        self.assertEqual(run_send("mcp__Discord__send_message", {"message": "ship monday. test tuesday. fix wednesday. review thursday."})[0], 0)
+
+    def test_email_prose_blocks(self):
+        # Opaque-hash connector, detected as mail by the payload shape (to + subject + body).
+        self.assertEqual(run_send("mcp__abc123__send_message", {"to": "x@y.com", "subject": "update", "body": "Our comprehensive solution will help."})[0], 2)
+        self.assertEqual(run_send("mcp__abc123__reply", {"threadId": "t", "body": "Thanks — files attached."})[0], 2)
+        self.assertEqual(run_send("mcp__x__outlook_create_draft", {"to": "a@b.com", "subject": "x", "body": "In today's fast-paced world we ship."})[0], 2)
+
+    def test_email_prose_allows_clean(self):
+        self.assertEqual(run_send("mcp__x__outlook_create_draft", {"to": "a@b.com", "subject": "files", "body": "Hi team, the files are attached. Thanks, Jarrhey"})[0], 0)
+
+    def test_ticket_comment_blocks_and_allows(self):
+        self.assertEqual(run_send("mcp__jira-penbrothers__jira_add_comment", {"comment": "This leverages a cutting-edge approach."})[0], 2)
+        self.assertEqual(run_send("mcp__h__addCommentToJiraIssue", {"commentBody": "Made the ID optional. If it is blank we skip the lookup."})[0], 0)
+
+    def test_hard_ban_blocks_on_first_occurrence(self):
+        # A single named banned word is below the density threshold but still blocks on a send.
+        self.assertEqual(run_send("mcp__x__outlook_send_mail", {"to": "a@b.com", "subject": "s", "body": "A robust plan."})[0], 2)
+
+    def test_non_send_mcp_ignored(self):
+        self.assertEqual(run_send("mcp__Discord__read_channel", {"channel": "x"})[0], 0)
+
+
 if __name__ == "__main__":
     unittest.main()

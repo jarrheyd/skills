@@ -19,7 +19,8 @@ import sys
 PROSE_EXTENSIONS = {".md", ".mdx", ".txt", ".html", ".htm"}
 
 # Also check string-heavy source files, but only string literals
-SOURCE_EXTENSIONS = {".tsx", ".jsx", ".ts", ".js", ".py"}
+SOURCE_EXTENSIONS = {".tsx", ".jsx", ".ts", ".js", ".mjs", ".cjs", ".py",
+                     ".swift", ".kt", ".dart", ".go", ".rb", ".vue", ".svelte"}
 
 SKIP_PATTERNS = [
     "node_modules",
@@ -34,6 +35,8 @@ SKIP_PATTERNS = [
     # SKILL.md and README.md are NOT exempt: they must pass the gate they describe.
     "deslop/references/",
     "deslop/hooks/",
+    # Test fixtures quote the tells on purpose, same as the catalogs above.
+    "/tests/",
     # Don't check design system references
     "design-system/references/",
     "brand-system/references/",
@@ -678,6 +681,133 @@ def check_restatement(content):
     return violations
 
 
+# ============================================================
+# SEND / DRAFT / COMMENT GATING (email, tickets, chat)
+# ============================================================
+# A send never touches a local file, so the file checks above never see it. These tools
+# carry the body in their own argument. Classify by the tool name and the payload shape,
+# pull the body, and run the right depth of check:
+#   chat  -> tells only. His chat voice is lowercase and fragmented; the prose-shape
+#            checks (title case, bold lead, uniform sentences, density) false-positive on it.
+#   prose -> full set. Email bodies and ticket comments are real prose.
+
+CHAT_NAME_HINTS = ("discord", "telegram", "teams", "imessage", "slack")
+EMAIL_NAME_HINTS = ("gmail", "outlook")
+TICKET_NAME_HINTS = ("jira", "wrike", "confluence")
+
+# Body-carrying keys, most specific first. Recipient keys are never pulled as body.
+BODY_KEYS = ("commentBody", "htmlBody", "body", "message", "text", "content",
+             "comment", "description", "markdown", "message_body", "note")
+SUBJECT_KEYS = ("subject", "title", "summary")
+# These keys in a payload mark it as mail even when the tool name is an opaque hash.
+EMAIL_SHAPE_KEYS = ("subject", "threadId", "replyToMessageId", "bcc", "cc")
+
+
+def _short_tool_name(tool_name):
+    return tool_name.split("__")[-1] if tool_name else tool_name
+
+
+def classify_send(tool_name, tool_input):
+    """Return 'chat', 'prose', or None for a send/draft/comment tool."""
+    if not tool_name.startswith("mcp__"):
+        return None
+    name = tool_name.lower()
+    short = _short_tool_name(tool_name).lower()
+
+    # Chat apps first: match the server segment, since send_message is shared with email.
+    if any(h in name for h in CHAT_NAME_HINTS):
+        if any(v in short for v in ("send", "reply", "message", "forum", "post")):
+            return "chat"
+        return None
+
+    # Email: by name, or by a mail-shaped payload (covers opaque-hash connectors).
+    email_shape = any(k in tool_input for k in EMAIL_SHAPE_KEYS) or (
+        ("to" in tool_input) and any(b in tool_input for b in ("body", "htmlBody", "message")))
+    if any(h in name for h in EMAIL_NAME_HINTS) or email_shape:
+        if any(v in short for v in ("send", "draft", "reply", "forward", "mail", "message")):
+            return "prose"
+        return None
+
+    # Tickets / wiki: issue bodies and comments.
+    if any(h in name for h in TICKET_NAME_HINTS):
+        if any(v in short for v in ("comment", "create", "update", "page", "issue", "task")):
+            return "prose"
+        return None
+
+    return None
+
+
+def _flatten_text(node):
+    """Best-effort plain text from an ADF-like nested body (Atlassian, etc.)."""
+    out = []
+    if isinstance(node, dict):
+        if isinstance(node.get("text"), str):
+            out.append(node["text"])
+        for v in node.values():
+            if isinstance(v, (dict, list)):
+                out.append(_flatten_text(v))
+    elif isinstance(node, list):
+        for item in node:
+            out.append(_flatten_text(item))
+    return " ".join(t for t in out if t)
+
+
+def extract_send_body(tool_input, include_subject=False):
+    """Pull the human-written body (plus subject for email) from a send payload."""
+    parts = []
+    if include_subject:
+        for k in SUBJECT_KEYS:
+            v = tool_input.get(k)
+            if isinstance(v, str) and v.strip():
+                parts.append(v)
+                break
+    for k in BODY_KEYS:
+        v = tool_input.get(k)
+        if isinstance(v, str) and v.strip():
+            parts.append(v)
+            break
+        if isinstance(v, (dict, list)) and v:
+            flat = _flatten_text(v)
+            if flat.strip():
+                parts.append(flat)
+            break
+    return "\n".join(p for p in parts if p).strip()
+
+
+# His named hard-ban words (global CLAUDE.md). They are density-flagged elsewhere, which
+# never trips on a short send, so on the send path they block on the first occurrence.
+SEND_HARD_BAN = ("comprehensive", "robust", "detailed", "cutting-edge", "cutting edge",
+                 "innovative", "synergy", "whack-a-mole", "whack a mole")
+
+
+def check_hard_ban(body):
+    out = []
+    low = body.lower()
+    for w in SEND_HARD_BAN:
+        if re.search(r"(?<![\w-])" + re.escape(w) + r"(?![\w-])", low):
+            out.append((0, f"[BLOCK] banned word: '{w}' - write the plain noun instead"))
+    return out
+
+
+def run_send_checks(body, mode):
+    """mode 'chat' -> tells only; 'prose' -> full set. Returns list of (line, msg)."""
+    emdash = []
+    if EM_DASH in body:
+        emdash = [(0, f"[BLOCK] em dash present ({body.count(EM_DASH)}x) - banned outright; use a hyphen, comma, or period")]
+    if mode == "chat":
+        return (check_hard_ban(body) + check_banned_phrases(body) + check_curly_quotes(body)
+                + check_middot_separator(body) + emdash)
+    blocks = (check_hard_ban(body) + check_banned_phrases(body) + check_curly_quotes(body)
+              + check_title_case_headings(body) + check_bold_overuse(body)
+              + check_bold_lead_paragraph(body) + check_middot_separator(body)
+              + check_explainer_headings(body) + check_restatement(body)
+              + check_structural_tics(body) + check_emoji_bullets(body)
+              + check_uniform_sentences(body) + check_weak_phrases(body) + emdash)
+    blocks += [(0, w) for w in check_word_density(body)]
+    blocks += [(w[0], w[1]) if isinstance(w, tuple) else (0, w) for w in check_filler_transitions(body)]
+    return blocks
+
+
 def main():
     if os.environ.get("DISABLE_ANTI_SLOP_HOOK", "0") == "1":
         sys.exit(0)
@@ -690,6 +820,27 @@ def main():
 
     tool_name = input_data.get("tool_name", "")
     tool_input = input_data.get("tool_input", {})
+
+    # Send / draft / comment surfaces (email, tickets, chat) never hit a file path, so the
+    # file checks below never see them. Gate them here before the Write/Edit early-exit.
+    send_mode = classify_send(tool_name, tool_input)
+    if send_mode:
+        body = extract_send_body(tool_input, include_subject=(send_mode == "prose"))
+        if not body.strip():
+            sys.exit(0)
+        blocks = run_send_checks(body, send_mode)
+        if blocks:
+            label = _short_tool_name(tool_name)
+            parts = [f"AI Slop BLOCKED: {len(blocks)} pattern(s) in {label} ({send_mode} send):\n"]
+            for _line_num, msg in blocks[:8]:
+                parts.append(f"  {msg}")
+            if len(blocks) > 8:
+                parts.append(f"\n  ... and {len(blocks) - 8} more.")
+            parts.append("\nRewrite without these AI patterns before it sends. Then match his voice: "
+                         "sample his last sends in this channel and mirror their shape.")
+            print("\n".join(parts), file=sys.stderr)
+            sys.exit(2)
+        sys.exit(0)
 
     if tool_name not in ["Edit", "Write", "MultiEdit"]:
         sys.exit(0)
