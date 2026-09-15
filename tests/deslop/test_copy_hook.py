@@ -45,6 +45,8 @@ BLOCKS = [
     ("title case heading", "# The Art Of The Deal"),
     ("heading with banned phrase", "# Unlock the power of skills"),
     ("explainer heading", "# The margin gap, and why it matters"),
+    ("comma in short headline", "# One login, every tool"),
+    ("comma appositive headline", "# Software, with patients"),
     ("bold-lead paragraph", "**Evidence boundary.** A timestamp confirms nothing."),
     ("restatement", "The invite button opens the native share sheet from the circle page. The invite button opens the native share sheet from the circle page."),
     ("filler transition", "Furthermore, the plan holds."),

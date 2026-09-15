@@ -54,7 +54,7 @@ claude
 > /qa-review setup
 # answer the env questions, fill ~/.qa-review/<project>/.env with test creds
 > /qa-review audit
-# open the report, greenlight or not
+# open the report and greenlight
 ```
 
 ## Layout

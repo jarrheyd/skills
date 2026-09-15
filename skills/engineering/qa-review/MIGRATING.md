@@ -10,7 +10,7 @@ Holds your `.env` credentials and every past run. Move it, do not recreate it: c
 mv ~/.scout ~/.qa-review
 ```
 
-## 2. Config file, per repo
+## 2. Config file per repo
 
 ```bash
 git mv .maestro/scout.config.json .maestro/qa-review.config.json

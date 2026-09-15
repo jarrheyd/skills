@@ -1,4 +1,4 @@
-# Example: Kindred PR 696, code-only
+# Example: Kindred PR 696 (code-only)
 
 A recorded product-review run against a real, merged pull request, so the skill's output has a proven shape to copy. It ran in code-only mode: no build or simulator, the diff is the evidence, and the one visual expectation stays CAN'T TELL on purpose.
 

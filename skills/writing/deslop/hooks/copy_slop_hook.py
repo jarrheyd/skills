@@ -256,6 +256,14 @@ EXPLAINER_HEADINGS = [
      "why-it-matters heading: state the stake itself, not that there is one"),
 ]
 
+# BLOCK: a comma in a short display heading (added 2026-09-16). The rule: if a headline
+# needs a comma it is usually two ideas and too long. Scoped to short headings so long
+# list-style headings and ordinary doc headings are spared. Excluded, to match the
+# existing legitimate cases: a date ("September 4, 2026"), an "X, or Y?" decision framing,
+# an "X, or ..." explanatory heading ("Kindred invites, or how circles grow"), and a
+# schedule gloss ("Migration, in three weeks").
+HEADLINE_COMMA_MAX_WORDS = 6
+
 # ============================================================
 # BLOCKING: density (added 2026-09-02)
 #
@@ -570,10 +578,25 @@ def check_explainer_headings(content):
     for i, text in _heading_texts(content):
         # Strip trailing markdown emphasis/punctuation that would hide an end anchor.
         probe = text.rstrip("*_`#").rstrip()
+        matched = False
         for pattern, msg in EXPLAINER_HEADINGS:
             if re.search(pattern, probe):
                 violations.append((i, f"[BLOCK] {msg}"))
+                matched = True
                 break
+        if matched:
+            continue
+        if "," in probe:
+            words = len(re.findall(r"\S+", probe))
+            date_comma = re.search(r",\s*\d", probe)          # "September 4, 2026", "Q3, 2026"
+            decision = probe.rstrip().endswith("?")            # "Apply, or subscribe?"
+            or_framing = re.search(r",\s+or\s+", probe, re.I)  # "Kindred invites, or how circles grow"
+            schedule = re.search(                              # "Migration, in three weeks"
+                r",\s+in\s+(?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+"
+                r"(?:second|minute|hour|day|week|month|year|quarter)s?\b", probe, re.I)
+            if (words <= HEADLINE_COMMA_MAX_WORDS
+                    and not date_comma and not decision and not or_framing and not schedule):
+                violations.append((i, '[BLOCK] comma in a short heading - a headline that needs a comma is usually two ideas; shorten or split it (e.g. "One login, every tool" -> "One login")'))
     return violations
 
 
