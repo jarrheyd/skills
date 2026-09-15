@@ -597,6 +597,20 @@ def check_explainer_headings(content):
             if (words <= HEADLINE_COMMA_MAX_WORDS
                     and not date_comma and not decision and not or_framing and not schedule):
                 violations.append((i, '[BLOCK] comma in a short heading - a headline that needs a comma is usually two ideas; shorten or split it (e.g. "One login, every tool" -> "One login")'))
+        # A heading broken into two terse sentence-fragments ("Four rails. One
+        # job each.") is the two-beat cadence - swapping a comma for a period
+        # is not a fix. Use the plain noun phrase and let the subhead carry the
+        # rest. Split on an internal period/exclamation followed by a capital.
+        # Split only where the period follows a letter, so a numbered heading
+        # ("1. Prerequisites", "Step 2. Do it") does not read as two fragments.
+        core = probe.rstrip()
+        segs = [s.strip() for s in re.split(r"(?<=[A-Za-z][.!])\s+(?=[A-Z0-9])", core) if s.strip()]
+        if len(segs) >= 2:
+            seg_words = [len(re.findall(r"\S+", s)) for s in segs]
+            abbrev = re.compile(r"^([A-Za-z]\.){1,}[A-Za-z]?\.?$")   # U.S., e.g., i.e.
+            if (sum(seg_words) <= 8 and all(w <= 4 for w in seg_words)
+                    and not any(abbrev.match(s) for s in segs)):
+                violations.append((i, '[BLOCK] staccato heading - two terse fragments like "Four rails. One job each." is an AI two-beat cadence; use the plain noun phrase and let the subhead carry the rest'))
     return violations
 
 
