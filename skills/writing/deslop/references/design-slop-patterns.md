@@ -151,3 +151,15 @@ Regex-caught by `hooks/design_slop_hook.py` are marked (hook); the rest need a r
 - **No footer caption** that re-explains the slide at the bottom. Both the top explainer and bottom caption make a slide wordy - cut both.
 - A slide is one idea, shown - not an idea wrapped in a label, a header, and a caption. See the "no corner chrome" rule.
 - **No summary closing slide.** A closing slide, if you need one, is a thank-you or contact info - never a recap of what was just shown. The deck already made the point.
+
+## Deck tells learned from live correction (2026-09-17)
+
+Caught by hand across an eight-round strategy-deck review the write-hooks never saw, because the deck lived in Claude Design and Google Slides. Judgment tells for the review agent.
+
+- Comma two-beat headline. A slide title built as two short parallel or imperative clauses joined by a comma, like "All-in prices, held at the counter" or "Surface every tier, unblock stuck supply". It is the antithesis cadence moved into a heading. Fix: one plain clause a person would say out loud.
+- Wordy feature-card grid. Three or more cards, each an icon plus a bold title plus a description sentence. It fails the three-second executive skim. Fix: let the headline and one visual carry the point, cut the card sentences to short labels, or drop the grid.
+- Staged mockup. A social post that does not look like how people actually post: an arty stock silhouette with a clean Book button overlaid, or a tidy card with a booking tile. Fix: match the real platform, a native reel with caption, side icons and link in bio, or a real Facebook page post with reactions and comments.
+- Outcome dressed as strategy. A play or strategy slide whose headline states a value or promise, like "What you see is what you pay", instead of the move you make, like "Get providers to commit to all-in prices". Fix: headline the action, show the mechanism, and name the hard part.
+- Unverified specifics as fact. Provider counts, adoption ratios, or first-shown prices stated flat with no source you would defend. Fix: verify it, cut it, or mark it a target. Keep a per-deck claims ledger the author can veto.
+- Footers and source lines on slides. Citation lines, production-data stamps, and page furniture at the bottom. Fix: cut them, a slide is one idea shown.
+- Outdated tactics. For a strategy or marketing deck, check the plays against current trends so nothing reads as years old (search-only where the move is AI answers and creator-first).
