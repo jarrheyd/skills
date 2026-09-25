@@ -46,3 +46,13 @@ Distilled from production Maestro suites that gate real releases. Follow these f
 
 - Dev/staging only, deterministic auth (fixed test OTP or plain test account). Never point a flow at production; `guard-env.sh` enforces this.
 - Non-idempotent flows (real signup) stay out of the default gate and document their reset procedure.
+
+## Traps that break full regressions (learned on Kapwa, Sep 2026)
+
+- `- back` only works on Android. On iOS it silently does nothing, and the next step fails on the wrong screen. Tap the screen's own back button by id instead.
+- Fixed names collide on the next run: duplicate detection, "already exists", or a list with many copies. Give created things a unique name per run: `- evalScript: ${output.name = 'Kid ' + Date.now()}`, then `inputText: ${output.name}`, and assert with a loose regex.
+- A pressable card that wraps text and buttons becomes one accessibility element on iOS. Its children disappear from the tree, so text and button selectors inside it fail, and VoiceOver users cannot reach the buttons either. The fix belongs in the app (`accessible={false}` on the wrapper), not in the flow.
+- Apps that keep a sentence's last two words together (a non-breaking space) break exact text matches. Match sentences loosely: `'.*First steps across the living.room.*'`, or give the text a plain accessibility label in the app.
+- `scrollUntilVisible` wants the whole element on screen by default. A tall card never qualifies; add `centerElement: true` or target a smaller child.
+- A flow that needs data only one script creates (a harness that runs API steps between flows) belongs in config `scenarios` or `flowSetup`, never in the one-by-one suite with `${VAR}` left unset. The doctor lists these as fixture gaps.
+- The simulator can drop its network mid-run (an offline banner in the screenshot). Classify it as ENV and let the retry rerun it; never rewrite a flow for it.
