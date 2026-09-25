@@ -122,6 +122,43 @@ for (const d of src) {
 }
 if (analytics) add(guarded ? 'OK' : 'WARN', 'Test traffic in analytics', guarded ? 'app skips analytics on a simulator/emulator' : 'the app uses product analytics and has no simulator/emulator switch', 'make the app skip analytics on a simulator or emulator, and have the backend skip test accounts, so regression runs never reach the team dashboard');
 
+// Flattened tappable wrappers (React Native): a Touchable/Pressable that holds
+// its own buttons becomes one iOS accessibility element, hiding the inner
+// buttons from VoiceOver and from every UI-test selector.
+if (c.platform !== 'web') {
+  const TAGS = ['TouchableOpacity', 'Pressable', 'TouchableWithoutFeedback', 'TouchableHighlight', 'PressableScale'];
+  const offenders = [];
+  const walkTsx = (dir) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) { if (!['node_modules', '__mocks__', 'build', 'ios', 'android', '.git'].includes(e.name)) walkTsx(full); }
+      else if (e.name.endsWith('.tsx') && !e.name.includes('.test.')) {
+        const src = fs.readFileSync(full, 'utf8');
+        const open = new RegExp(`<(${TAGS.join('|')})\\b`, 'g');
+        let m;
+        while ((m = open.exec(src))) {
+          let depth = 0, end = -1;
+          for (let i = m.index + m[0].length; i < src.length; i++) {
+            const ch = src[i];
+            if (ch === '{') depth++; else if (ch === '}') depth--; else if (ch === '>' && depth === 0) { end = i; break; }
+          }
+          if (end < 0) continue;
+          const opening = src.slice(m.index, end + 1);
+          if (opening.endsWith('/>') || /\baccessible\b/.test(opening) || !/\bonPress\b/.test(opening)) continue;
+          const pair = new RegExp(`<(/?)${m[1]}\\b[^>]*?(/?)>`, 'gs');
+          pair.lastIndex = end + 1;
+          let level = 1, p2, body = '';
+          while ((p2 = pair.exec(src))) { if (p2[1] === '/') level--; else if (p2[2] !== '/') level++; if (level === 0) { body = src.slice(end + 1, p2.index); break; } }
+          if (/\b(onPress|onLongPress)=/.test(body)) offenders.push(`${path.relative(repo, full)}:${src.slice(0, m.index).split('\n').length}`);
+        }
+      }
+    }
+  };
+  for (const d of src) walkTsx(d);
+  if (offenders.length) add('WARN', 'Flattened tap targets', `${offenders.length} tappable wrapper(s) hold their own buttons: ${offenders.slice(0, 3).join(', ')}${offenders.length > 3 ? ', ...' : ''}`, 'add accessible={false} to each wrapper so VoiceOver and UI tests can reach the inner buttons');
+  else add('OK', 'Flattened tap targets', 'no tappable wrapper hides its own buttons');
+}
+
 // Design rules
 add(c.uiRules?.length || c.designDoc ? 'OK' : 'WARN', 'UI rules', c.uiRules?.length ? `${c.uiRules.length} rule(s)` : c.designDoc ? 'designDoc set' : 'none', 'add "designDoc" and a few "uiRules" so the UI pass checks the app\'s own rules');
 
