@@ -47,7 +47,7 @@ From the templates, adapted to the real code:
 
 So `qa-review regression` is one repeatable command on this project:
 
-- Test data: if the repo has a seed or fixture script, set `seedCmd` to it. It must print the ids flows need as `KEY=VALUE` lines. No script yet: write a small one that creates the test account's data over the API and prints the ids.
+- Test data: if the repo has a seed or fixture script, set `seedCmd` to it. It must first clear what earlier runs left on the test accounts (created pages, groups, posts, invites), then create fresh data and print the ids flows need as `KEY=VALUE` lines. Without the reset, leftovers pile up and cause duplicate-name prompts, long lists and flaky pickers. Flows that create things should name them with a timestamp so the reset can find exactly those. No script yet: write a small one over the API.
 - Ordered scenarios: existing scripts that run several flows in order with API steps between (`run-*.sh` and similar) go into `scenarios` with the flows each one runs, plus `scenarioEnv`. A flow that only needs its own data prepared goes in `flowSetup` instead.
 - Throwaway flows (screenshot scripts, one-off checks) go in `excludeFlows`.
 - Analytics: if the app sends product analytics, make it skip a simulator or emulator, and have the backend skip test accounts, before the first run. Ask before changing app code; say plainly in the report if it could not be done.
