@@ -35,9 +35,11 @@ while [ $# -gt 0 ]; do
     --tag) TAG="$2"; shift 2;;
     --flows) FLOWS="$2"; shift 2;;
     --no-build) BUILD_REPORT=0; shift;;
+    --resume) RESUME=1; shift;;
     *) echo "qa-review: unknown arg $1" >&2; exit 1;;
   esac
 done
+RESUME="${RESUME:-0}"
 [ -n "$REPO" ] || { echo "qa-review: --repo <path> required" >&2; exit 1; }
 CONFIG="$REPO/.maestro/qa-review.config.json"
 [ -f "$CONFIG" ] || { echo "qa-review: $CONFIG missing, run qa-review setup first" >&2; exit 1; }
@@ -50,7 +52,16 @@ SIMULATOR="$(jqget simulator)"; SIMULATOR="${SIMULATOR:-iPhone 17}"
 [ -n "$PROJECT" ] || { echo "qa-review: config has no project name" >&2; exit 1; }
 
 HOME_DIR="$HOME/.qa-review/$PROJECT"
-RUN_DIR="$HOME_DIR/runs/$(date +%Y%m%d-%H%M%S)"
+# --resume reuses the newest run dir so a suite that died mid-way (a wedged driver,
+# a crash) picks up where it stopped instead of restarting from zero. A flow with a
+# passing result in that dir is skipped below. No prior dir => a fresh run.
+if [ "$RESUME" = "1" ]; then
+  RUN_DIR="$(ls -dt "$HOME_DIR"/runs/*/ 2>/dev/null | head -1)"; RUN_DIR="${RUN_DIR%/}"
+  [ -n "$RUN_DIR" ] || RUN_DIR="$HOME_DIR/runs/$(date +%Y%m%d-%H%M%S)"
+  echo "qa-review: resuming into $RUN_DIR"
+else
+  RUN_DIR="$HOME_DIR/runs/$(date +%Y%m%d-%H%M%S)"
+fi
 mkdir -p "$RUN_DIR/debug"
 
 # Production guard runs before anything launches.
@@ -118,6 +129,8 @@ elif [ "$PLATFORM" = "mobile" ]; then
     xcrun simctl bootstatus "$UDID" -b
   fi
   DEVICE_ARGS=(--device "$UDID")
+  # Build/install/seed commands can target the exact simulator (several may be booted).
+  export QA_REVIEW_UDID="$UDID"
   if [ -n "$BUILD_CMD" ] && [ "${QA_REVIEW_SKIP_BUILD:-}" != "1" ]; then
     echo "qa-review: building app ($BUILD_CMD). Set QA_REVIEW_SKIP_BUILD=1 to reuse the installed build."
     (cd "$REPO" && eval "$BUILD_CMD")
@@ -131,6 +144,27 @@ else
   # Web: Maestro drives its own Chromium. The flows carry url: themselves;
   # nothing to boot here.
   echo "qa-review: web platform, flows drive Chrome directly"
+fi
+
+# Seed: a project can reset its test data before every run (config "seedCmd").
+# Its KEY=VALUE output lines (fresh fixture ids) are merged into the project .env
+# and reloaded, so a deleted seed post never breaks the next run. A failed seed
+# stops the run: flows over missing fixtures would fail for the wrong reason.
+SEED_CMD="$(jqget seedCmd)"
+if [ -n "$SEED_CMD" ] && [ "${QA_REVIEW_SKIP_SEED:-}" != "1" ] && [ "$RESUME" != "1" ]; then
+  echo "qa-review: seeding test data (seedCmd). Set QA_REVIEW_SKIP_SEED=1 to skip."
+  mkdir -p "$RUN_DIR"
+  (cd "$REPO" && eval "$SEED_CMD") > "$RUN_DIR/seed.log" 2>&1 || { echo "qa-review: seed FAILED, see $RUN_DIR/seed.log" >&2; exit 1; }
+  grep -E '^[A-Z][A-Z0-9_]*=' "$RUN_DIR/seed.log" | node "$SCRIPT_DIR/merge-env.mjs" "$HOME_DIR/.env"
+  ENV_ARGS=(); ENV_COUNT=0
+  while IFS='=' read -r k v; do
+    [ -n "$k" ] && [[ "$k" != \#* ]] || continue
+    v="${v%\"}"; v="${v#\"}"
+    ENV_ARGS+=(-e "$k=$v"); ENV_COUNT=$((ENV_COUNT+1))
+  done < "$HOME_DIR/.env"
+  echo "qa-review: reloaded $ENV_COUNT env vars after seeding"
+elif [ -n "$SEED_CMD" ]; then
+  echo "qa-review: SKIPPED seed step (QA_REVIEW_SKIP_SEED=1 or --resume); using the fixtures already in .env"
 fi
 
 # Build fingerprint: what was actually under test, so a later report can tell
@@ -187,22 +221,42 @@ else
   for f in flows/*.yaml; do
     base="$(basename "$f")"
     case "$base" in _*) continue;; esac
+    # Config "excludeFlows": globs for throwaway flows (screenshot scripts, one-off
+    # checks) that are not part of the suite.
+    node "$SCRIPT_DIR/config-glob.mjs" "$CONFIG" excluded "$base" && continue
     if [ -n "$TAG" ]; then
       grep -qE "^  - $TAG\$" "$f" || continue
     fi
     SELECTED+=("$f")
   done
 fi
-[ ${#SELECTED[@]} -gt 0 ] || { echo "qa-review: no flows selected (tag=$TAG)" >&2; exit 1; }
+# Scenarios (config "scenarios"): flows a project runs through its own ordered
+# script are left out of the one-by-one loop and run as a unit below. Full runs
+# only; --flows or --tag runs the named flows directly.
+RUN_SCENARIOS=0
+if [ -z "$FLOWS" ] && [ -z "$TAG" ]; then
+  SCEN_FLOWS="$(node "$SCRIPT_DIR/scenarios.mjs" "$CONFIG" flows)"
+  if [ -n "$SCEN_FLOWS" ]; then
+    RUN_SCENARIOS=1
+    KEEP=()
+    for f in ${SELECTED[@]+"${SELECTED[@]}"}; do
+      n="$(basename "${f%.yaml}")"
+      printf '%s\n' "$SCEN_FLOWS" | grep -qx "$n" || KEEP+=("$f")
+    done
+    SELECTED=(${KEEP[@]+"${KEEP[@]}"})
+    echo "qa-review: $(printf '%s\n' "$SCEN_FLOWS" | grep -c .) flow(s) run inside scenarios, not one by one"
+  fi
+fi
+[ ${#SELECTED[@]} -gt 0 ] || [ "$RUN_SCENARIOS" = "1" ] || { echo "qa-review: no flows selected (tag=$TAG)" >&2; exit 1; }
 
 # Web flows carry their own url: header, so guard every selected flow's target too,
 # not only the config value.
-for f in "${SELECTED[@]}"; do
+for f in ${SELECTED[@]+"${SELECTED[@]}"}; do
   for u in $(grep -hoE '^\s*(url|-\s*openLink):\s*\S+' "$f" | awk '{print $NF}' | tr -d '"'"'"'"'); do
     "$SCRIPT_DIR/guard-env.sh" "$u" >/dev/null
   done
 done
-echo "qa-review: running ${#SELECTED[@]} flow(s): ${SELECTED[*]}"
+echo "qa-review: running ${#SELECTED[@]} flow(s): ${SELECTED[*]:-}"
 
 # One invocation for the set; per-flow retry for failures. A wedged driver call
 # can hang, so everything runs under a hard timeout.
@@ -220,9 +274,27 @@ with_timeout() { # secs, cmd...
   local secs="$1"; shift
   if [ -n "$TIMEOUT_BIN" ]; then "$TIMEOUT_BIN" "$secs" "$@"; else perl -e 'alarm shift; exec @ARGV' "$secs" "$@"; fi
 }
+# Per-flow setup: config "flowSetup" maps a flow-name glob to a command that
+# prepares that flow's own fixtures (a harness script that creates a page, a
+# circle history, a set of role accounts). Its KEY=VALUE output lines reach only
+# that flow, as extra -e vars, and win over the project .env. A failed setup is
+# recorded as the flow's failure with the setup log, so it never reads as a pass.
+flow_setup_cmd() { node "$SCRIPT_DIR/config-glob.mjs" "$CONFIG" setup "$1"; }
 run_flow() { # args: junit-out, flow
-  local out="$1" flow="$2"
-  with_timeout "${QA_REVIEW_FLOW_TIMEOUT:-900}" maestro ${DEVICE_ARGS[@]+"${DEVICE_ARGS[@]}"} test "$flow" ${ENV_ARGS[@]+"${ENV_ARGS[@]}"} --format junit --output "$out" --debug-output "$RUN_DIR/debug"
+  local out="$1" flow="$2" name setup extra=()
+  name="$(basename "$flow")"
+  setup="$(flow_setup_cmd "$name")"
+  if [ -n "$setup" ]; then
+    local log="$RUN_DIR/setup-${name%.yaml}.log"
+    echo "qa-review: [$name] setup: $setup"
+    if ! (cd "$REPO" && eval "$setup") > "$log" 2>&1; then
+      echo "qa-review: [$name] setup FAILED, see $log"
+      printf '<?xml version="1.0"?><testsuites><testsuite name="setup" tests="1" failures="1"><testcase id="%s" name="%s"><failure>ENV: flow setup failed (%s), see %s</failure></testcase></testsuite></testsuites>' "${name%.yaml}" "${name%.yaml}" "$setup" "$log" > "$out"
+      return 1
+    fi
+    while IFS='=' read -r k v; do extra+=(-e "$k=$v"); done < <(grep -E '^[A-Z][A-Z0-9_]*=' "$log")
+  fi
+  with_timeout "${QA_REVIEW_FLOW_TIMEOUT:-900}" maestro ${DEVICE_ARGS[@]+"${DEVICE_ARGS[@]}"} test "$flow" ${ENV_ARGS[@]+"${ENV_ARGS[@]}"} ${extra[@]+"${extra[@]}"} --format junit --output "$out" --debug-output "$RUN_DIR/debug"
 }
 # Per-flow mode: one maestro invocation per flow. Maestro validates the whole
 # workspace before a multi-flow run and aborts everything on a single addMedia
@@ -234,8 +306,21 @@ set +e
 if [ "$PER_FLOW" = "1" ]; then
   SUITE_RC=0
   FAILED_LIST=""
-  for f in "${SELECTED[@]}"; do
+  for f in ${SELECTED[@]+"${SELECTED[@]}"}; do
     name="$(basename "${f%.yaml}")"
+    # Resume: a flow that already has a passing result in this run dir is skipped,
+    # so a re-invoke after a wedge only runs what is left.
+    if [ "$RESUME" = "1" ] && [ -f "$RUN_DIR/result-$name.xml" ] && ! grep -q "<failure\|<error" "$RUN_DIR/result-$name.xml"; then
+      echo "qa-review: [$name] already passed, skipping (resume)"
+      continue
+    fi
+    # Driver-wedge recovery: the iOS XCUITest runner wedges ("device became
+    # unreachable") and poisons the next flow. Kill any stale runner first so each
+    # flow starts clean. No-op on platforms without it.
+    if [ "$PLATFORM" != "web" ] && [ "$PLATFORM" != "android" ]; then
+      pkill -9 -f UITests-Runner >/dev/null 2>&1 || true
+      sleep 3
+    fi
     echo "qa-review: [$name] running"
     run_flow "$RUN_DIR/result-$name.xml" "$f"
     rc=$?
@@ -269,6 +354,34 @@ if [ "$PER_FLOW" != "1" ] && [ $SUITE_RC -ne 0 ] && [ "${QA_REVIEW_NO_RETRY:-}" 
       set -e
     done
   fi
+fi
+
+# Scenarios: each project script runs as one unit against this simulator, with
+# its per-flow results filed into this run dir. Config "scenarioEnv" is exported
+# for them (target env, API base). Resume skips a scenario whose flows all passed.
+if [ "$RUN_SCENARIOS" = "1" ]; then
+  eval "$(node -e "const c=require('$CONFIG');for(const [k,v] of Object.entries(c.scenarioEnv||{}))console.log('export '+k+'='+JSON.stringify(String(v)))")"
+  export E2E_IOS_UDID="${UDID:-}"
+  while IFS=$'\t' read -r sname scmd; do
+    [ -z "$sname" ] && continue
+    owned="$(node "$SCRIPT_DIR/scenarios.mjs" "$CONFIG" owned "$sname")"
+    if [ "$RESUME" = "1" ]; then
+      allpass=1
+      for fl in $owned; do
+        [ -f "$RUN_DIR/result-$fl.xml" ] && ! grep -q "<failure\|<error" "$RUN_DIR/result-$fl.xml" || allpass=0
+      done
+      [ "$allpass" = "1" ] && { echo "qa-review: [scenario $sname] already passed, skipping (resume)"; continue; }
+    fi
+    art="$RUN_DIR/scenario-$sname"; rm -rf "$art"; mkdir -p "$art"
+    [ "$PLATFORM" != "web" ] && [ "$PLATFORM" != "android" ] && { pkill -9 -f UITests-Runner >/dev/null 2>&1 || true; sleep 3; }
+    echo "qa-review: [scenario $sname] running"
+    set +e
+    (cd "$REPO" && E2E_ARTIFACT_DIR="$art" with_timeout "${QA_REVIEW_SCENARIO_TIMEOUT:-2700}" bash -c "$scmd") > "$RUN_DIR/scenario-$sname.log" 2>&1
+    src=$?
+    set -e
+    node "$SCRIPT_DIR/scenarios.mjs" collect "$art" "$RUN_DIR" "$sname" "$src" $owned
+    [ $src -eq 0 ] && echo "qa-review: [scenario $sname] passed" || { echo "qa-review: [scenario $sname] FAILED (rc=$src)"; SUITE_RC=1; }
+  done < <(node "$SCRIPT_DIR/scenarios.mjs" "$CONFIG" list)
 fi
 
 node "$SCRIPT_DIR/summarize-run.mjs" --run "$RUN_DIR"

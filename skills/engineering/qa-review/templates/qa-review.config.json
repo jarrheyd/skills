@@ -1,12 +1,25 @@
 {
-  "_comment": "Committed with the repo; never put secrets here. platform: mobile|android|web. mobile (iOS) uses appId + buildCmd/installCmd + simulator; android uses appId + buildCmd/installCmd and the first online adb device; web uses url (flows also carry url: themselves). errorCopy = the app's literal error-state strings, greped from source, used by screen-walk assertNotVisible. envKeys = the credential keys the user must fill in ~/.qa-review/<project>/.env.",
+  "_comment": "Committed with the repo; never put secrets here. See README 'Config keys'. Required: project, platform, appId|url. Everything else is optional; delete what you do not use.",
   "project": "acme",
   "platform": "mobile",
   "appId": "com.example.acme.dev",
   "url": "",
-  "buildCmd": "npx react-native run-ios --mode Release",
-  "installCmd": "",
-  "simulator": "iPhone 17",
+  "simulator": "iPhone 16 Pro",
+  "buildCmd": "cd ios && xcodebuild -workspace Acme.xcworkspace -scheme Dev -configuration Release -sdk iphonesimulator -derivedDataPath build/sim -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build -quiet",
+  "installCmd": "xcrun simctl install ${QA_REVIEW_UDID:-booted} ios/build/sim/Build/Products/Release-iphonesimulator/Acme.app",
+  "seedCmd": "node .maestro/seed.mjs",
+  "excludeFlows": ["zz-*", "scratch-*"],
+  "flowSetup": { "checkout-*": "node .maestro/fixtures/checkout.mjs prepare" },
+  "scenarios": [
+    { "name": "two-user", "cmd": "bash .maestro/run-two-user.sh", "flows": ["accept-invite", "join-via-code"] }
+  ],
+  "scenarioEnv": { "E2E_TARGET_ENV": "dev", "E2E_API_BASE": "https://api.dev.example.com" },
   "errorCopy": ["Something went wrong", "We couldn't load this"],
-  "envKeys": ["QA_REVIEW_USER", "QA_REVIEW_PASS"]
+  "envKeys": ["QA_REVIEW_USER", "QA_REVIEW_PASS"],
+  "designDoc": "docs/DESIGN.md",
+  "uiRules": [
+    "Titles and buttons use Title Case.",
+    "Buttons never truncate their label.",
+    "One primary button per area."
+  ]
 }

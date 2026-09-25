@@ -13,6 +13,16 @@ Drive the app the way a user would, keep the proof, and let a human greenlight f
 
 ## Modes
 
+Three public modes, each ending in a branded proof (`references/publish.md`):
+
+| Invocation | Mode file | What it does |
+| --- | --- | --- |
+| `qa-review smoke` | `modes/smoke.md` | The fast gate: run the core flows, branded pass/fail proof |
+| `qa-review functional` | `modes/functional.md` | Change-scoped: run the flows this build touched, publish a proof that summarizes the changes |
+| `qa-review regression` | `modes/regression.md` | The full suite that replaces hand-written QA scripts: resumable, freshness-repaired, ending in a production-readiness verdict |
+
+Building blocks the three modes call (invoke directly for the narrow task):
+
 | Invocation | Mode file | What it does |
 | --- | --- | --- |
 | `qa-review setup` | `modes/setup.md` | Bootstrap a project: generate flows, manifest, screen-walk from the code |
@@ -20,8 +30,11 @@ Drive the app the way a user would, keep the proof, and let a human greenlight f
 | `qa-review crosscheck <sheet-or-file>` | `modes/crosscheck.md` | Verify a QA test script case by case against the live app |
 | `qa-review audit [--changed] [--product]` | `modes/audit.md` | Pre-deployment full audit + coverage gap analysis |
 | `qa-review review <script>` | `modes/review.md` | Review or author a QA test script without driving the app |
+| `qa-review doctor` | (script) | `node scripts/qa-review-doctor.mjs --repo <repo>`: is the project ready for a repeatable regression; OK/WARN/FAIL with the fix per item |
 
-Read ONLY the mode file for the invoked mode. If no mode is named, ask which one, or infer it: a spreadsheet or test script link means crosscheck; "before we ship / deploy" means audit; a repo with no `.maestro/` means setup.
+Read ONLY the mode file for the invoked mode. If no mode is named, infer it: "quick check / does it still work" means smoke; "before I mark this done / what changed" means functional; "before we ship / full pass / replace the QA scripts" means regression; a spreadsheet or test script link means crosscheck; a repo with no `.maestro/` means setup.
+
+The proof always wears the target app's brand. Every public mode runs `scripts/detect-brand.mjs` first (colors, light or dark, fonts, logo, into `~/.qa-review/<project>/brand.json`), and `build-report.mjs` themes the report from it. Detection is best-effort with a neutral fallback, so a miss never blocks the proof.
 
 ## Where things live
 
@@ -29,7 +42,9 @@ Read ONLY the mode file for the invoked mode. If no mode is named, ask which one
 - Local device (never committed): `~/.qa-review/<project>/` holds `.env` (credentials, user-filled) and `runs/<timestamp>/` (Maestro debug output, screenshots, JUnit XML, `run-summary.json`, `report.html`)
 - Skill scripts: `scripts/` in this skill directory. Call them with absolute paths; they take the project via `--project <name>` or `QA_REVIEW_PROJECT`.
 
-`qa-review.config.json` (committed, no secrets): `{ "project": "<name>", "platform": "mobile|android|web", "appId" | "url", "buildCmd", "installCmd", "errorCopy": ["..."], "envKeys": ["QA_REVIEW_USER", ...] }`.
+`qa-review.config.json` (committed, no secrets): `{ "project": "<name>", "platform": "mobile|android|web", "appId" | "url", "buildCmd", "installCmd", "errorCopy": ["..."], "envKeys": ["QA_REVIEW_USER", ...] }`
+
+Optional keys: `seedCmd` (resets test data before each run; its `KEY=VALUE` output lines are merged into the local `.env`), `excludeFlows` (globs for throwaway flows kept out of the suite), `designDoc` and `uiRules` (what the UI and consistency pass checks screens against).
 
 ## Hard rules (every mode)
 
@@ -61,4 +76,5 @@ Follow `references/conventions.md` for every flow you write or edit. Short versi
 | `references/verdicts.md` | Crosscheck verdict definitions + evidence bar |
 | `references/product-rubric.md` | The `--product` UX review rubric |
 | `references/web-driving.md` | Maestro on web: url config, selectors, quirks |
+| `references/ui-consistency.md` | The UI and consistency pass: every captured screen checked against the design doc and `uiRules`, findings with severity |
 | `references/regression-report.md` | Flows as a numbered regression-test-case matrix, failure classification (crash / defect / flow-rot / env), flow freshness, crash and freeze capture, the production-readiness line |

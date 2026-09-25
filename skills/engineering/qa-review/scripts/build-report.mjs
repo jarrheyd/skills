@@ -40,6 +40,79 @@ const manifest = JSON.parse(fs.readFileSync(args.manifest, 'utf8'));
 const config = args.config && fs.existsSync(args.config) ? JSON.parse(fs.readFileSync(args.config, 'utf8')) : {};
 const isWeb = (config.platform || 'mobile') === 'web';
 
+// ---- brand theme (from detect-brand.mjs) -----------------------------------
+// The proof wears the target app's own brand: colors, light/dark base, fonts,
+// logo. Missing brand.json => the neutral default palette below, so it never fails.
+const brand = (() => {
+  const p = args.brand || (home && path.join(home, 'brand.json'));
+  try { return p && fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : null; } catch { return null; }
+})();
+const MIME = { '.ttf': 'font/ttf', '.otf': 'font/otf', '.woff': 'font/woff', '.woff2': 'font/woff2' };
+// Embed a small curated set of the app's font files (a few weights) as @font-face
+// data URIs so the single HTML file renders in the app's type anywhere.
+function fontFaces() {
+  if (!brand?.fonts?.files?.length) return { css: '', sans: null, heading: null, accent: null };
+  const files = brand.fonts.files.filter((f) => fs.existsSync(f));
+  const famOf = (n) => path.basename(n).toLowerCase();
+  const wantWeight = (n) => /(regular|medium|semibold|bold)\b/i.test(n) || !/(light|thin|italic|black|extra)/i.test(n);
+  const roleFiles = (fam) => {
+    if (!fam) return [];
+    const key = fam.toLowerCase().replace(/[^a-z]/g, '');
+    return files.filter((f) => famOf(f).replace(/[^a-z]/g, '').startsWith(key.slice(0, 6)) && wantWeight(f)).slice(0, 3);
+  };
+  const roles = [['BrandSans', brand.fonts.sans], ['BrandHeading', brand.fonts.heading], ['BrandAccent', brand.fonts.accent]];
+  let css = '';
+  const seen = new Set();
+  const present = {};
+  for (const [css_family, fam] of roles) {
+    const picks = roleFiles(fam);
+    if (!picks.length) continue;
+    present[css_family] = true;
+    for (const f of picks) {
+      const ext = path.extname(f).toLowerCase();
+      const weight = /bold/i.test(f) ? 700 : /semibold/i.test(f) ? 600 : /medium/i.test(f) ? 500 : 400;
+      const id = `${css_family}-${weight}`;
+      if (seen.has(id)) continue; seen.add(id);
+      try {
+        const b = fs.readFileSync(f).toString('base64');
+        css += `@font-face{font-family:'${css_family}';font-weight:${weight};font-display:swap;src:url(data:${MIME[ext] || 'font/ttf'};base64,${b});}\n`;
+      } catch {}
+    }
+  }
+  return { css, sans: present.BrandSans ? 'BrandSans' : null, heading: present.BrandHeading ? 'BrandHeading' : null, accent: present.BrandAccent ? 'BrandAccent' : null };
+}
+const FF = fontFaces();
+const SANS = FF.sans ? `'${FF.sans}',` : '';
+const HEAD = FF.heading ? `'${FF.heading}',` : (FF.sans ? `'${FF.sans}',` : '');
+const ACCENT_FONT = FF.accent ? `'${FF.accent}',` : HEAD;
+// Logo: inline an SVG, or data-URI a PNG, into the header.
+function logoHtml() {
+  const p = brand?.logo; if (!p || !fs.existsSync(p)) return '';
+  const ext = path.extname(p).toLowerCase();
+  try {
+    if (ext === '.svg') { const s = fs.readFileSync(p, 'utf8').replace(/<\?xml[^>]*\?>/, '').trim(); return `<span class="logo">${s}</span>`; }
+    const b = fs.readFileSync(p).toString('base64');
+    return `<span class="logo"><img alt="" src="data:image/${ext.slice(1)};base64,${b}"/></span>`;
+  } catch { return ''; }
+}
+const LOGO = logoHtml();
+// CSS variables: the app's palette, or the neutral default when no brand.json.
+const C = brand?.colors || {};
+const DEF = { bg: '#FCFCFB', surface: '#F6F5F2', ink: '#2E2B27', muted: '#6E675F', primary: '#1E6B4F', accent: '#1E6B4F', ok: '#1E6B4F', bad: '#A4452C', line: '#E7E2DA' };
+const V = { ...DEF, ...C };
+const rootVars = `--ground:${V.bg}; --raise:${V.surface}; --ink:${V.ink}; --soft:${V.muted}; --faint:${V.muted}99;
+    --accent:${V.primary}; --wash:${V.surface}; --line:${V.line}; --ok:${V.ok}; --bad:${V.bad};`;
+const isDarkBrand = brand?.mode === 'dark';
+// Optional "What changed" block for the Functional proof: the agent writes an
+// outcome-based, app-voice summary (HTML or plain text) to a file, passed as --summary.
+const CHANGES = (() => {
+  if (!args.summary || !fs.existsSync(args.summary)) return '';
+  let s = ''; try { s = fs.readFileSync(args.summary, 'utf8').trim(); } catch { return ''; }
+  if (!s) return '';
+  const body = /<\w+/.test(s) ? s : s.split(/\n{2,}/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
+  return `<section class="changes"><h2>What changed</h2>${body}</section>`;
+})();
+
 // Resolve run directories, newest first. Tolerates flaky runs: a flow that
 // failed in the latest run still shows its last good screenshots from an
 // earlier retained run.
@@ -298,9 +371,11 @@ function gapsSection() {
 }
 function productSection() {
   if (!product || !product.findings?.length) return '';
-  return `<section class="extra"><h2>Product notes</h2>
-    <p class="sub">UX findings from the product pass, one screenshot per screen.</p>
-    ${product.findings.map((f) => `<article class="qa"><h3>${esc(f.screen)}</h3><p>${esc(f.finding)}${f.fix ? ` Suggested fix: ${esc(f.fix)}` : ''}</p>${f.shot && fs.existsSync(f.shot) ? `<div class="reel">${figure(b64(f.shot), esc(f.screen))}</div>` : ''}</article>`).join('')}
+  // product.title / product.sub let the regression UI pass reuse this section
+  // ("UI and consistency"); severity marks a blocker vs a polish item.
+  return `<section class="extra"><h2>${esc(product.title || 'Product notes')}</h2>
+    <p class="sub">${esc(product.sub || 'UX findings from the product pass, one screenshot per screen.')}</p>
+    ${product.findings.map((f) => `<article class="qa"><h3>${esc(f.screen)}${f.severity ? ` <span class="sev">${esc(f.severity)}</span>` : ''}</h3><p>${esc(f.finding)}${f.fix ? ` Suggested fix: ${esc(f.fix)}` : ''}</p>${f.shot && fs.existsSync(f.shot) ? `<div class="reel">${figure(b64(f.shot), esc(f.screen))}</div>` : ''}</article>`).join('')}
   </section>`;
 }
 
@@ -350,20 +425,28 @@ const html = `<!doctype html>
 <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${esc(title)}</title>
 <style>
+  ${FF.css}
   :root{
-    --ground:#FCFCFB; --raise:#F6F5F2; --ink:#2E2B27; --soft:#6E675F; --faint:#A79E94;
-    --accent:#1E6B4F; --wash:#EAF2EE; --line:#E7E2DA; --ok:#1E6B4F; --bad:#A4452C;
+    ${rootVars}
   }
   *{box-sizing:border-box}
   html{-webkit-text-size-adjust:100%}
   body{margin:0;background:var(--ground);color:var(--ink);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    font-family:${SANS}-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
     line-height:1.55;font-size:17px;-webkit-font-smoothing:antialiased}
   .page{max-width:720px;margin:0 auto;padding:56px 24px 96px}
-  header h1{font-size:32px;font-weight:700;letter-spacing:-0.02em;margin:0 0 10px}
+  .logo{display:block;margin:0 0 16px}
+  .logo svg{height:34px;width:auto;display:block}
+  .logo img{height:34px;width:auto;display:block}
+  header h1{font-family:${HEAD}-apple-system,BlinkMacSystemFont,sans-serif;font-size:32px;font-weight:700;letter-spacing:-0.02em;margin:0 0 10px}
+  .qa h3,.extra h2{font-family:${HEAD}-apple-system,BlinkMacSystemFont,sans-serif}
   .intro{color:var(--soft);font-size:17px;margin:0;max-width:48ch}
   .meta{margin-top:18px;font-size:14px;color:var(--soft)}
   .meta b{color:${greenlight ? 'var(--ok)' : 'var(--bad)'}}
+  .changes{margin-top:22px;padding:18px 20px;background:var(--wash);border:1px solid var(--line);border-radius:14px}
+  .changes h2{font-family:${HEAD}-apple-system,sans-serif;font-size:18px;margin:0 0 8px;color:var(--ink)}
+  .changes p{margin:0 0 8px;color:var(--soft);font-size:15px}
+  .changes p:last-child{margin-bottom:0}
   .search{position:relative;margin-top:26px}
   #q{width:100%;font-family:inherit;font-size:16px;color:var(--ink);background:var(--raise);
     border:1px solid var(--line);border-radius:12px;padding:12px 16px;outline:none}
@@ -428,10 +511,12 @@ const html = `<!doctype html>
 </style></head><body>
 <div class="page">
   <header>
+    ${LOGO}
     <h1>${esc(title)}</h1>
     ${manifest.intro ? `<p class="intro">${esc(manifest.intro)}</p>` : ''}
     <div class="meta">${esc(buildLabel)}. <b>${headline}</b>. ${breakdown}</div>
   </header>
+  ${CHANGES}
   <div class="search">
     <input id="q" type="search" placeholder="Search flows" aria-label="Search flows" autocomplete="off" />
   </div>

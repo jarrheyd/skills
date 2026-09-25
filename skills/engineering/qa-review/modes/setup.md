@@ -43,6 +43,17 @@ From the templates, adapted to the real code:
 - One flow per top journey, following `references/conventions.md`
 - Screens missing testIDs: add them to the app code (one-line changes), list them in your summary
 
+## 5b. Make it regression-ready
+
+So `qa-review regression` is one repeatable command on this project:
+
+- Test data: if the repo has a seed or fixture script, set `seedCmd` to it. It must print the ids flows need as `KEY=VALUE` lines. No script yet: write a small one that creates the test account's data over the API and prints the ids.
+- Ordered scenarios: existing scripts that run several flows in order with API steps between (`run-*.sh` and similar) go into `scenarios` with the flows each one runs, plus `scenarioEnv`. A flow that only needs its own data prepared goes in `flowSetup` instead.
+- Throwaway flows (screenshot scripts, one-off checks) go in `excludeFlows`.
+- Analytics: if the app sends product analytics, make it skip a simulator or emulator, and have the backend skip test accounts, before the first run. Ask before changing app code; say plainly in the report if it could not be done.
+- UI rules: point `designDoc` at the design system doc and add 5 to 12 `uiRules`, one checkable sentence each (casing, button labels, loader, card consistency, one primary per area).
+- Run `node scripts/qa-review-doctor.mjs --repo <repo>` and fix every FAIL.
+
 ## 6. Run until green
 
 `scripts/qa-review-run.sh --repo <repo>` (guard-env runs inside it). Read `run-summary.json`. For each failure open ONLY that flow's last screenshot, fix the selector or flow, rerun just that flow (`--flows`). Loop until green or genuinely blocked (unfilled .env, env down); blocked is reported, not worked around.
