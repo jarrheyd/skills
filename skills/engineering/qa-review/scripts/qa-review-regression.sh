@@ -58,4 +58,18 @@ echo "== flows still without a result: $(missing)"
 
 echo "== UI review set"
 node "$SCRIPT_DIR/ui-gallery.mjs" --run "$RUN_DIR"
+
+echo "== result"
+pass=0; fail=0; failed=""
+while read -r f; do
+  [ -z "$f" ] && continue
+  n="${f%.yaml}"; x="$RUN_DIR/result-$n.xml"; r="$RUN_DIR/result-retry-$n.xml"
+  if [ -f "$r" ] && ! grep -q "<failure\|<error" "$r"; then pass=$((pass+1))
+  elif [ -f "$x" ] && ! grep -q "<failure\|<error" "$x"; then pass=$((pass+1))
+  elif [ -f "$x" ] || [ -f "$r" ]; then fail=$((fail+1)); failed="$failed $n"
+  fi
+done < <(node "$SCRIPT_DIR/config-glob.mjs" "$REPO/.maestro/qa-review.config.json" suite "$REPO/.maestro/flows")
+echo "passed: $pass  failed: $fail  without a result: $(missing)"
+[ -n "$failed" ] && echo "failed:$failed"
+echo "next: classify each red, repair stale flows, run the UI pass, publish (modes/regression.md)"
 echo "$RUN_DIR"
