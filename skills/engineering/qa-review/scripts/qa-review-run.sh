@@ -46,6 +46,7 @@ SCENARIOS_ONLY="${SCENARIOS_ONLY:-0}"
 # QA_REVIEW_CONFIG picks another config in the same repo (e.g. an Android one
 # beside the iOS default).
 CONFIG="${QA_REVIEW_CONFIG:-$REPO/.maestro/qa-review.config.json}"
+case "$CONFIG" in /*) ;; *) CONFIG="$(cd "$REPO" && pwd)/$CONFIG";; esac
 [ -f "$CONFIG" ] || { echo "qa-review: $CONFIG missing, run qa-review setup first" >&2; exit 1; }
 
 jqget() { node -e "const c=require('$CONFIG');process.stdout.write(String(c['$1']??''))"; }
@@ -327,6 +328,14 @@ if [ "$PER_FLOW" = "1" ]; then
     # Driver-wedge recovery: the iOS XCUITest runner wedges ("device became
     # unreachable") and poisons the next flow. Kill any stale runner first so each
     # flow starts clean. No-op on platforms without it.
+    # Android: a driver left from the previous flow dies on connect
+    # ("Device server died during 'deviceInfo'"), so drop its port forwards and
+    # driver apps; maestro reinstalls a fresh one in a few seconds.
+    if [ "$PLATFORM" = "android" ]; then
+      adb -s "$SERIAL" forward --remove-all >/dev/null 2>&1 || true
+      adb -s "$SERIAL" uninstall dev.mobile.maestro >/dev/null 2>&1 || true
+      adb -s "$SERIAL" uninstall dev.mobile.maestro.test >/dev/null 2>&1 || true
+    fi
     if [ "$PLATFORM" != "web" ] && [ "$PLATFORM" != "android" ]; then
       pkill -9 -f UITests-Runner >/dev/null 2>&1 || true
       sleep 3
