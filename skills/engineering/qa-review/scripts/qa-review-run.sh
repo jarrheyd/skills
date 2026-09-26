@@ -43,6 +43,9 @@ done
 RESUME="${RESUME:-0}"
 SCENARIOS_ONLY="${SCENARIOS_ONLY:-0}"
 [ -n "$REPO" ] || { echo "qa-review: --repo <path> required" >&2; exit 1; }
+# Absolute from here on: later steps cd elsewhere, and a relative --repo .
+# then pointed the report at a manifest that is not there.
+REPO="$(cd "$REPO" && pwd)"
 # One run per machine at a time. Two runners share the device driver and each
 # kills the other's session ("Device server died", every flow red in ~80ms),
 # which is how a forgotten background run poisoned a whole Android pass.
@@ -342,16 +345,15 @@ if [ "$PER_FLOW" = "1" ]; then
     # Driver-wedge recovery: the iOS XCUITest runner wedges ("device became
     # unreachable") and poisons the next flow. Kill any stale runner first so each
     # flow starts clean. No-op on platforms without it.
-    # Android: a driver left from the previous flow dies on connect
-    # ("Device server died during 'deviceInfo'"), so drop its port forwards and
-    # driver apps; maestro reinstalls a fresh one in a few seconds.
+    # Android: a driver left from the previous flow can still hold the device
+    # socket, so stop it and drop the port forwards. Do NOT uninstall it: a
+    # reinstall per flow was too slow on an emulator and failed the connect
+    # ("Device server died during 'deviceInfo'") on nearly every flow.
     if [ "$PLATFORM" = "android" ]; then
+      adb -s "$SERIAL" shell am force-stop dev.mobile.maestro >/dev/null 2>&1 || true
+      adb -s "$SERIAL" shell am force-stop dev.mobile.maestro.test >/dev/null 2>&1 || true
       adb -s "$SERIAL" forward --remove-all >/dev/null 2>&1 || true
-      adb -s "$SERIAL" uninstall dev.mobile.maestro >/dev/null 2>&1 || true
-      adb -s "$SERIAL" uninstall dev.mobile.maestro.test >/dev/null 2>&1 || true
-      # Let the old driver process finish exiting; starting the next flow
-      # straight away still hit "Device server died" at connect about 1 in 3.
-      sleep 4
+      sleep 2
     fi
     if [ "$PLATFORM" != "web" ] && [ "$PLATFORM" != "android" ]; then
       pkill -9 -f UITests-Runner >/dev/null 2>&1 || true
