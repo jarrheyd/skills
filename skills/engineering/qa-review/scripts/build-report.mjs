@@ -275,7 +275,14 @@ const b64 = (p) => {
   const mime = buf[0] === 0xff && buf[1] === 0xd8 ? 'image/jpeg' : 'image/png';
   return `data:${mime};base64,${buf.toString('base64')}`;
 };
-const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+// Printed text is normalised so the proof passes a deslop gate: long dashes
+// become a plain hyphen and curly quotes become straight ones.
+const plain = (s) =>
+  String(s)
+    .replace(/\s*[\u2014\u2013]\s*/g, ' - ')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"');
+const esc = (s) => plain(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const fmtDate = (isoStr) => {
   if (!isoStr) return null;
