@@ -69,6 +69,8 @@ if (unwired.length) add('WARN', 'Scenario scripts', `${unwired.length} run-*.sh 
 for (const s of c.scenarios || []) {
   const file = (s.cmd.match(/[\w./-]+\.sh/) || [])[0];
   if (file && !fs.existsSync(path.join(repo, file))) add('FAIL', `Scenario ${s.name}`, `${file} missing`, 'fix the cmd path');
+  else if (file && !/E2E_ARTIFACT_DIR/.test(fs.readFileSync(path.join(repo, file), 'utf8')))
+    add('WARN', `Scenario ${s.name}`, 'script ignores E2E_ARTIFACT_DIR, so its flows all get the script\'s overall pass/fail', 'write each flow\'s JUnit to $E2E_ARTIFACT_DIR/NN-<flow>/result.xml (maestro --format junit --output) so the report shows which flow failed');
   for (const f of s.flows || []) if (!flows.includes(`${f}.yaml`)) add('WARN', `Scenario ${s.name}`, `flow ${f} not found`, 'remove it or add the flow');
 }
 
