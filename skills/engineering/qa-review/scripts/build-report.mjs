@@ -19,7 +19,7 @@
 //     --gaps       <gaps.json>               (optional coverage-gap section)
 //     --product    <product-notes.json>      (optional UX-findings section)
 //     --build    "pre-deploy 2026-08-31"     (footer label)
-//     --shots    6                           (max screenshots per journey)
+//     --shots    12                          (max screenshots per journey)
 //     --previous <older report.html>         (carry reels forward for flows not run)
 //     --buildinfo <run>/build.json           (what was under test, from the runner)
 //     --carrydays 7                          (how long carried evidence counts green)
@@ -148,7 +148,7 @@ if (!runDirs.length) console.error('build-report: warning, no run directories fo
 
 const statePath = args.state || (home ? path.join(home, '.report-state.json') : null);
 const outPath = args.out || (runDirs[0] ? path.join(path.dirname(runDirs[0]), 'report.html') : 'report.html');
-const maxShots = Number(args.shots || 6);
+const maxShots = Number(args.shots || 12);
 const buildLabel = args.build || 'local run';
 const reviewedAt = args.now ? new Date(args.now) : new Date();
 
@@ -179,6 +179,22 @@ const retried = new Set();
 // Flows that never ran because their scenario stopped at an earlier step.
 const scenarioStopped = new Set();
 const status = junitStatus();
+
+// Every flow that ran gets a card. The report used to walk the journeys
+// manifest only, so a flow that ran but was never listed there (73 of 143 in
+// Kapwa's Sep 26 regression) vanished from the proof, screenshots and all.
+const UNLISTED_CATEGORY = 'Other flows (not in the journey list yet)';
+{
+  const listed = new Set(manifest.journeys.map((j) => j.flow));
+  const humanize = (f) => f.replace(/[-_]+/g, ' ').replace(/^./, (c) => c.toUpperCase());
+  const unlisted = Object.keys(status).filter((f) => !listed.has(f)).sort();
+  for (const flow of unlisted) {
+    manifest.journeys.push({ id: flow, flow, title: humanize(flow), category: UNLISTED_CATEGORY, unlisted: true });
+  }
+  if (unlisted.length && Array.isArray(manifest.categories) && !manifest.categories.includes(UNLISTED_CATEGORY)) {
+    manifest.categories.push(UNLISTED_CATEGORY);
+  }
+}
 
 // What was under test this run, written by qa-review-run.sh. Null when the runner
 // could not fingerprint the build; carried evidence then always expires, so an
@@ -233,7 +249,18 @@ function shotsFor(flow, cap = maxShots) {
     const named = path.join(run, flow, 'takeScreenshot');
     if (!fs.existsSync(named)) continue;
     const pngs = fs.readdirSync(named).filter((f) => f.toLowerCase().endsWith('.png')).sort();
-    if (pngs.length) return pngs.slice(0, cap).map((f) => path.join(named, f));
+    if (!pngs.length) continue;
+    const picked = pngs.slice(0, cap).map((f) => path.join(named, f));
+    // A red flow stops between named moments, so add the last automatic
+    // capture from the same attempt: the screen it actually failed on.
+    if (status[flow] === 'failed') {
+      const auto = path.join(run, flow, 'screenshots');
+      const last = fs.existsSync(auto)
+        ? fs.readdirSync(auto).filter((f) => f.toLowerCase().endsWith('.png')).sort().pop()
+        : null;
+      if (last) picked.push(path.join(auto, last));
+    }
+    return picked;
   }
   for (const run of runDirs) {
     for (const dir of [path.join(run, flow, 'screenshots'), path.join(run, flow)]) {
@@ -309,8 +336,10 @@ for (const j of manifest.journeys) {
 // retina-crisp at a fraction of raw PNG size. Falls back to the raw file when
 // sips is missing (non-macOS).
 let rawEmbeds = 0;
-const IMG_MAX_PX = Number(args.imgpx || 1000);
-const IMG_QUALITY = Number(args.imgq || 86);
+// 640px at quality 62 keeps a full 150-flow regression near 15MB so it opens
+// and shares; pass --imgpx/--imgq for a sharper single-flow proof.
+const IMG_MAX_PX = Number(args.imgpx || 640);
+const IMG_QUALITY = Number(args.imgq || 62);
 const b64 = (p) => {
   let buf;
   try {

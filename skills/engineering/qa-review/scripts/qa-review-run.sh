@@ -43,7 +43,9 @@ done
 RESUME="${RESUME:-0}"
 SCENARIOS_ONLY="${SCENARIOS_ONLY:-0}"
 [ -n "$REPO" ] || { echo "qa-review: --repo <path> required" >&2; exit 1; }
-CONFIG="$REPO/.maestro/qa-review.config.json"
+# QA_REVIEW_CONFIG picks another config in the same repo (e.g. an Android one
+# beside the iOS default).
+CONFIG="${QA_REVIEW_CONFIG:-$REPO/.maestro/qa-review.config.json}"
 [ -f "$CONFIG" ] || { echo "qa-review: $CONFIG missing, run qa-review setup first" >&2; exit 1; }
 
 jqget() { node -e "const c=require('$CONFIG');process.stdout.write(String(c['$1']??''))"; }
