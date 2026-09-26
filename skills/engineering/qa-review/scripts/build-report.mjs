@@ -168,12 +168,16 @@ function junitStatus() {
       const flow = m[1].replace(/\.yaml$/, '');
       const failed = /<failure|<error/.test(m[3] || '');
       map[flow] = failed ? 'failed' : 'passed';
+      if (failed && /no result of its own/.test(m[3] || '')) scenarioStopped.add(flow);
+      else scenarioStopped.delete(flow);
       if (isRetry) retried.add(flow);
     }
   }
   return map;
 }
 const retried = new Set();
+// Flows that never ran because their scenario stopped at an earlier step.
+const scenarioStopped = new Set();
 const status = junitStatus();
 
 // What was under test this run, written by qa-review-run.sh. Null when the runner
@@ -240,7 +244,53 @@ function shotsFor(flow, cap = maxShots) {
       return [...new Set(pick)].map((f) => path.join(dir, f));
     }
   }
+  // Scenario flows write under <run>/scenario-*/**/runtime/<ts>/<flow>/, outside
+  // debug/. Look there next, newest first.
+  for (const root of runRoots) {
+    const found = findFlowShotDir(root, flow, 5);
+    if (found) {
+      const pngs = fs.readdirSync(found).filter((f) => f.toLowerCase().endsWith('.png')).sort();
+      if (pngs.length) return pngs.slice(0, cap).map((f) => path.join(found, f));
+    }
+  }
+  // Last resort: Maestro's own failure capture for this flow
+  // ("screenshot-...-(<flow>.yaml).png"), so a flow that failed before its
+  // first takeScreenshot still shows where it stopped.
+  for (const run of runDirs) {
+    let files = [];
+    try { files = fs.readdirSync(run); } catch { continue; }
+    const fail = files.filter((f) => f.endsWith(`(${flow}.yaml).png`)).sort().pop();
+    if (fail) return [path.join(run, fail)];
+  }
   return [];
+}
+
+// qa-review run roots (the dirs holding debug/ and scenario-*/), newest first.
+const runRoots = [...new Set(runDirs.map((d) => {
+  const i = d.indexOf(`${path.sep}debug${path.sep}`);
+  return i >= 0 ? d.slice(0, i) : path.dirname(d);
+}))];
+
+function findFlowShotDir(dir, flow, depth) {
+  if (depth < 0) return null;
+  let entries = [];
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return null; }
+  const dirs = entries.filter((e) => e.isDirectory() && e.name !== 'debug' && e.name !== 'ui-review');
+  const hit = dirs.find((e) => e.name === flow);
+  if (hit) {
+    for (const sub of ['takeScreenshot', 'screenshots']) {
+      const p = path.join(dir, flow, sub);
+      if (fs.existsSync(p)) return p;
+    }
+  }
+  const sorted = dirs
+    .map((e) => path.join(dir, e.name))
+    .sort((a, b) => { try { return fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs; } catch { return 0; } });
+  for (const d of sorted) {
+    const found = findFlowShotDir(d, flow, depth - 1);
+    if (found) return found;
+  }
+  return null;
 }
 const ranThisRun = (flow) => Boolean(status[flow]) || shotsFor(flow).length > 0;
 
@@ -321,7 +371,17 @@ function journeyCard(j) {
       ? `<div class="reel-note">Not run this time. Showing the run of ${esc(fmtDate(carried.captured) || 'an earlier day')}, on this same build.</div><div class="reel">${carried.reel}</div>`
       : kind === 'expired'
         ? `<div class="reel-note">Not run this time, and ${esc(carried.reason)}. Showing the run of ${esc(fmtDate(carried.captured) || 'an earlier day')}. Needs a rerun.</div><div class="reel stale">${carried.reel}</div>`
-        : `<div class="reel-empty">${planned ? 'Planned. The flow for this is not built yet.' : 'Not captured in this run.'}</div>`;
+        : `<div class="reel-empty">${
+            planned
+              ? 'Planned. The flow for this is not built yet.'
+              : scenarioStopped.has(j.flow)
+                ? 'Its scenario stopped at an earlier step, so this part did not run.'
+                : st === 'failed'
+                ? 'Failed before its first screenshot.'
+                : status[j.flow]
+                  ? 'Ran with no screenshots. Add a takeScreenshot step to this flow.'
+                  : 'Did not run this time (its scenario or tag was not part of this run).'
+          }</div>`;
   const label = st === 'failed' ? 'Needs a look' : (retried.has(j.flow) ? 'Passed on retry' : 'Verified');
   const chip = planned
     ? `<span class="stamp planned">Planned</span>`
