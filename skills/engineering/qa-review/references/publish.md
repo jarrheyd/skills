@@ -33,6 +33,8 @@ Write it to `~/.qa-review/<name>/change-summary.html` (or plain text) before the
 
 ## 3. Publish the link
 
+The Artifact tool takes pages up to 16 MB. A full regression with every screenshot can pass that; rebuild with `--imgpx 640 --imgq 72 --shots 4` (smaller, fewer frames per flow) until it fits.
+
 The report is one self-contained HTML file with its screenshots, fonts, and logo embedded. Publish `<run>/report.html` with the Artifact tool for a hosted link, with a one-line description in the app's voice.
 
 Publishing is agent-side. When the agent cannot publish (not Claude Code), hand over the local `report.html` path instead; it is fully portable.

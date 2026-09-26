@@ -4,7 +4,7 @@
 # builds run-summary.json and report.html and prunes old runs.
 #
 # Usage:
-#   qa-review-run.sh --repo <path> [--tag smoke] [--flows "a.yaml b.yaml"] [--no-build]
+#   qa-review-run.sh --repo <path> [--tag smoke] [--flows "a.yaml b.yaml"] [--no-build] [--resume] [--scenarios-only]
 #
 # Reads .maestro/qa-review.config.json in the repo:
 #   project, platform (mobile|web), appId|url, buildCmd, installCmd, simulator
@@ -36,10 +36,12 @@ while [ $# -gt 0 ]; do
     --flows) FLOWS="$2"; shift 2;;
     --no-build) BUILD_REPORT=0; shift;;
     --resume) RESUME=1; shift;;
+    --scenarios-only) SCENARIOS_ONLY=1; shift;;
     *) echo "qa-review: unknown arg $1" >&2; exit 1;;
   esac
 done
 RESUME="${RESUME:-0}"
+SCENARIOS_ONLY="${SCENARIOS_ONLY:-0}"
 [ -n "$REPO" ] || { echo "qa-review: --repo <path> required" >&2; exit 1; }
 CONFIG="$REPO/.maestro/qa-review.config.json"
 [ -f "$CONFIG" ] || { echo "qa-review: $CONFIG missing, run qa-review setup first" >&2; exit 1; }
@@ -181,7 +183,11 @@ build_fingerprint() {
       [ -n "$container" ] && [ -d "$container" ] || return 0
       exe="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$container/Info.plist" 2>/dev/null || true)"
       [ -n "$exe" ] && [ -f "$container/$exe" ] || return 0
-      printf 'binary %s' "$(shasum -a 256 "$container/$exe" | awk '{print $1}')"
+      # The JS bundle ships beside the binary: a JS-only change leaves the
+      # executable untouched, so hash both or a new build looks like the old one.
+      local bundle=""
+      [ -f "$container/main.jsbundle" ] && bundle="$container/main.jsbundle"
+      printf 'binary %s' "$(cat "$container/$exe" ${bundle:+"$bundle"} | shasum -a 256 | awk '{print $1}')"
       ;;
     android)
       local apk
@@ -244,6 +250,8 @@ if [ -z "$FLOWS" ] && [ -z "$TAG" ]; then
       printf '%s\n' "$SCEN_FLOWS" | grep -qx "$n" || KEEP+=("$f")
     done
     SELECTED=(${KEEP[@]+"${KEEP[@]}"})
+    # --scenarios-only: run just the scenario scripts (their flows) this time.
+    [ "$SCENARIOS_ONLY" = "1" ] && SELECTED=()
     echo "qa-review: $(printf '%s\n' "$SCEN_FLOWS" | grep -c .) flow(s) run inside scenarios, not one by one"
   fi
 fi

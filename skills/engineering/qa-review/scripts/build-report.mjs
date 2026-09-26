@@ -364,8 +364,8 @@ function crosscheckSection() {
 }
 function gapsSection() {
   if (!gaps || !gaps.items?.length) return '';
-  return `<section class="extra"><h2>Coverage gaps</h2>
-    <p class="sub">Screens or branches in the code with no flow yet. Approve any of these to grow the manifest.</p>
+  return `<section class="extra"><h2>${esc(gaps.title || 'Coverage gaps')}</h2>
+    <p class="sub">${esc(gaps.sub || 'Screens or branches in the code with no flow yet. Approve any of these to grow the manifest.')}</p>
     <ul>${gaps.items.map((g) => `<li><b>${esc(g.area)}</b> (${esc(g.kind || 'happy')}): ${esc(g.note)}</li>`).join('')}</ul>
   </section>`;
 }
