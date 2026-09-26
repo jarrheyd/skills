@@ -46,7 +46,13 @@ SCENARIOS_ONLY="${SCENARIOS_ONLY:-0}"
 # One run per machine at a time. Two runners share the device driver and each
 # kills the other's session ("Device server died", every flow red in ~80ms),
 # which is how a forgotten background run poisoned a whole Android pass.
-OTHER_RUNS="$(pgrep -f 'qa-review-run.sh' | grep -vx "$$" | grep -vx "$PPID" || true)"
+OTHER_RUNS=""
+for pid in $(pgrep -f 'qa-review-run.sh' || true); do
+  # Skip this run, its parent, and its own subshells (same command line).
+  [ "$pid" = "$$" ] || [ "$pid" = "$PPID" ] && continue
+  [ "$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')" = "$$" ] && continue
+  OTHER_RUNS="$OTHER_RUNS $pid"
+done
 if [ -n "$OTHER_RUNS" ] && [ "${QA_REVIEW_ALLOW_PARALLEL:-}" != "1" ]; then
   echo "qa-review: another qa-review run is active (pid $(echo $OTHER_RUNS | tr '\n' ' ')). Stop it first, or set QA_REVIEW_ALLOW_PARALLEL=1 for separate devices." >&2
   exit 1
