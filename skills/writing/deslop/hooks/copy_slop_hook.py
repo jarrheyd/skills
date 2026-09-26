@@ -524,6 +524,109 @@ def check_uniform_sentences(content):
     return violations
 
 
+RHYTHM_CLOSER_LEADS = (
+    "treat ", "think of ", "call it ", "that is the ", "that's the ", "this is the ",
+    "which is ", "and that is ", "and that's ", "so that is ", "so that's ",
+)
+
+
+def check_label_every_block(content):
+    """BLOCK: a standalone bold line used as a section label, repeatedly (2026-09-23).
+
+    The tell is a document that announces each block before saying anything: a line that is
+    nothing but **Customer Support** or <strong>Operations</strong>, then the content under
+    it. Markdown already has headings; a bold pseudo-heading is a labelling tic. One is a
+    judgement call, three is a pattern. At three it hits 6 of 400 vault files, and those are
+    spec files (profile.md, voice-learning.md) that use labels deliberately. Raise to four if
+    that nags.
+    """
+    violations = []
+    hits = []
+    for i, line in enumerate(content.split("\n"), 1):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if re.fullmatch(r"\*\*[^*\n]{2,60}\*\*:?", stripped) or \
+           re.fullmatch(r"<strong[^>]*>[^<]{2,60}</strong>:?", stripped) or \
+           re.fullmatch(r"<b>[^<]{2,60}</b>:?", stripped):
+            hits.append(i)
+    if len(hits) >= 3:
+        violations.append((hits[0], f"[BLOCK] bold pseudo-heading on {len(hits)} blocks - labelling every block before you say anything is an AI tell; use a real heading or just write the paragraph"))
+    return violations
+
+
+def check_stacked_short_sentences(content):
+    """BLOCK: three or more short sentences in a row, all about the same length (2026-09-23).
+
+    Looser than check_uniform_sentences, which needs four sentences within one word of each
+    other. The tell here is the marching rhythm of three clipped declaratives, nine words or
+    fewer and within two words of each other: every clause
+    the same weight, nothing subordinated. Real writing subordinates - it trails the reason
+    on 'since', 'so' or 'because' instead of starting a new sentence for it.
+    """
+    violations = []
+    cleaned = _strip_code_and_tables(content)
+    for para in re.split(r"\n\s*\n", cleaned):
+        p = para.strip()
+        if not p or p.startswith(("#", "-", "*", "`", "|", ">")):
+            continue
+        sents = [sn for sn in _split_sentences(p) if sn.split()]
+        counts = [len(sn.split()) for sn in sents]
+        for j in range(len(counts) - 2):
+            window = counts[j:j + 3]
+            if max(window) <= 9 and max(window) - min(window) <= 2 and min(window) >= 3:
+                line_no = 0
+                for k, line in enumerate(content.split("\n"), 1):
+                    if p[:40] in line:
+                        line_no = k
+                        break
+                violations.append((line_no, f"[BLOCK] three short sentences in a row at {min(window)} to {max(window)} words - a marching rhythm is a tell; join two and trail the reason on 'since' or 'so'"))
+                break
+    return violations
+
+
+def check_landing_closer(content):
+    """BLOCK: a paragraph that ends on a short line built to land (2026-09-23).
+
+    The aphorism close: a long sentence carrying the content, then a clipped abstract one
+    that adds no fact and exists to sound final ('Treat release day as a non-event.').
+    Fires only when the closer is short, carries no number or proper noun, and follows a
+    sentence at least twice its length, so a genuinely short factual last line survives.
+    """
+    violations = []
+    cleaned = _strip_code_and_tables(content)
+    for para in re.split(r"\n\s*\n", cleaned):
+        p = para.strip()
+        if not p or p.startswith(("#", "-", "*", "`", "|", ">")):
+            continue
+        sents = [sn for sn in _split_sentences(p) if sn.split()]
+        if len(sents) < 2:
+            continue
+        last, prev = sents[-1], sents[-2]
+        lw, pw = len(last.split()), len(prev.split())
+        if lw > 9 or lw < 3 or pw < 2 * lw:
+            continue
+        body = last.rstrip(".!?")
+        if re.search(r"\d", body):
+            continue
+        # a capitalised word after the first is a proper noun, so the line carries a fact
+        if any(w[:1].isupper() for w in body.split()[1:]):
+            continue
+        low = body.lower()
+        aphorism = (low.startswith(RHYTHM_CLOSER_LEADS)
+                    or re.search(r"\bis (?:the|what|why|how)\b", low)
+                    or re.search(r"\b(?:the point|the whole point|the difference|what matters)\b", low))
+        if not aphorism:
+            continue
+        line_no = 0
+        for k, line in enumerate(content.split("\n"), 1):
+            if last[:40] in line:
+                line_no = k
+                break
+        violations.append((line_no, "[BLOCK] closing line built to land ('" + body[:40] + "') - it adds no fact; delete it or replace it with the thing it is gesturing at"))
+    return violations
+
+
 def check_structural_tics(content):
     """BLOCK: rhythm-level tells that need more than a phrase match."""
     violations = []
@@ -839,7 +942,9 @@ def run_send_checks(body, mode):
               + check_bold_lead_paragraph(body) + check_middot_separator(body)
               + check_explainer_headings(body) + check_restatement(body)
               + check_structural_tics(body) + check_emoji_bullets(body)
-              + check_uniform_sentences(body) + check_weak_phrases(body) + emdash)
+              + check_uniform_sentences(body) + check_label_every_block(body)
+              + check_stacked_short_sentences(body) + check_landing_closer(body)
+              + check_weak_phrases(body) + emdash)
     blocks += [(0, w) for w in check_word_density(body)]
     blocks += [(w[0], w[1]) if isinstance(w, tuple) else (0, w) for w in check_filler_transitions(body)]
     return blocks
@@ -913,7 +1018,9 @@ def main():
     middot = check_middot_separator(content)
     explainer = check_explainer_headings(content)
     restate = check_restatement(content)
-    tics = check_structural_tics(content) + check_emoji_bullets(content) + check_uniform_sentences(content)
+    tics = (check_structural_tics(content) + check_emoji_bullets(content)
+            + check_uniform_sentences(content) + check_label_every_block(content)
+            + check_stacked_short_sentences(content) + check_landing_closer(content))
     # Everything blocks; there is no warn tier. Density, filler transitions, weak copulas,
     # -ing tails, wordy phrases and false ranges all block. Em dashes block on any occurrence.
     # Paragraph-length uniformity is deliberately not checked: it false-positives on every

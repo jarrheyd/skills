@@ -349,6 +349,9 @@ if [ "$PER_FLOW" = "1" ]; then
       adb -s "$SERIAL" forward --remove-all >/dev/null 2>&1 || true
       adb -s "$SERIAL" uninstall dev.mobile.maestro >/dev/null 2>&1 || true
       adb -s "$SERIAL" uninstall dev.mobile.maestro.test >/dev/null 2>&1 || true
+      # Let the old driver process finish exiting; starting the next flow
+      # straight away still hit "Device server died" at connect about 1 in 3.
+      sleep 4
     fi
     if [ "$PLATFORM" != "web" ] && [ "$PLATFORM" != "android" ]; then
       pkill -9 -f UITests-Runner >/dev/null 2>&1 || true

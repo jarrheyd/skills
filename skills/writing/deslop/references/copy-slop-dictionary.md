@@ -392,3 +392,22 @@ Short-form and social patterns that leaked into everything else. Every one is a 
 - Law of threes. "Fast. Cheap. Done." or a sentence that closes on three single words with no "and" ("fast, cheap, reliable."). A plain list with an "and" passes. Fix: one sentence, or say why all three matter.
 - Every sentence the same length. Four or more sentences in a paragraph within a word of each other. Fix: vary the rhythm on purpose.
 - Emoji as bullets or line openers. Fix: cut them; a documented, fixed section-marker set in a recurring format is the one exception (judgment, the hook still blocks it, use `DESLOP_SKIP_PATHS` for such files).
+
+## Rhythm tells (2026-09-23)
+
+Pattern checks catch words. These three catch the shape of the sentences, which is what survives a clean word-level pass and still reads as machine-written. Added after a release plan passed every existing check and was rejected on rhythm alone.
+
+### Bold pseudo-heading on every block
+A line that is nothing but `**Customer Support**` or `<strong>Operations</strong>`, then the content underneath. Announcing each block before saying anything is a labelling tic, and markdown already has headings for this. Fires at three or more in one file.
+
+Instead: use a real heading, or drop the label and let the paragraph open with its own subject.
+
+### Three short sentences in a row
+Three consecutive sentences of nine words or fewer, all within two words of each other. Every clause carries the same weight and nothing is subordinated, which is the marching rhythm of generated prose.
+
+Instead: join two of them and trail the reason on "since", "so" or "because". "The build is done. QA signed it off. The date holds." becomes "The build is done and QA signed it off on Tuesday, so the date holds."
+
+### Closing line built to land
+A paragraph that ends on a short abstract sentence carrying no number and no proper noun, following a sentence at least twice its length. It exists to sound final rather than to say anything. "Treat release day as a non-event." "That is the point."
+
+Instead: delete it, or replace it with the fact it was gesturing at.
