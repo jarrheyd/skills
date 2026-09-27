@@ -188,8 +188,34 @@ const UNLISTED_CATEGORY = 'Other flows (not in the journey list yet)';
   const listed = new Set(manifest.journeys.map((j) => j.flow));
   const humanize = (f) => f.replace(/[-_]+/g, ' ').replace(/^./, (c) => c.toUpperCase());
   const unlisted = Object.keys(status).filter((f) => !listed.has(f)).sort();
+  // Cards read q (heading) and a (one line under it); an unlisted flow has
+  // neither, so the card printed "undefined". Name it from the file and take
+  // the line from the flow's own header comment.
+  const flowsDir = path.join(path.dirname(args.manifest), 'flows');
+  const headerLine = (flow) => {
+    try {
+      const text = fs.readFileSync(path.join(flowsDir, `${flow}.yaml`), 'utf8');
+      const lines = [];
+      for (const raw of text.split('\n')) {
+        const line = raw.trim();
+        if (!line.startsWith('#')) break;
+        const words = line.replace(/^#+\s?/, '');
+        if (!words) {
+          if (lines.length) break;
+          continue;
+        }
+        lines.push(words);
+      }
+      const joined = lines.join(' ').replace(/\s+/g, ' ').trim();
+      const sentence = joined.split(/(?<=[.!?])\s/)[0] || '';
+      return sentence.length > 180 ? `${sentence.slice(0, 177)}...` : sentence;
+    } catch {
+      return '';
+    }
+  };
   for (const flow of unlisted) {
-    manifest.journeys.push({ id: flow, flow, title: humanize(flow), category: UNLISTED_CATEGORY, unlisted: true });
+    const title = humanize(flow);
+    manifest.journeys.push({ id: flow, flow, title, q: title, a: headerLine(flow), category: UNLISTED_CATEGORY, unlisted: true });
   }
   if (unlisted.length && Array.isArray(manifest.categories) && !manifest.categories.includes(UNLISTED_CATEGORY)) {
     manifest.categories.push(UNLISTED_CATEGORY);
