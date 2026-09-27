@@ -28,6 +28,22 @@ cleanup() {
   return $ec
 }
 trap cleanup EXIT INT TERM
+
+# The iOS simulator sometimes shuts down mid-suite (seen twice on Sep 27, cause
+# unrecorded). Every later flow then failed as "device unreachable" in seconds,
+# so one shutdown sank the whole run. Boot it back before each flow instead.
+ensure_sim_booted() {
+  [ "$PLATFORM" = "web" ] || [ "$PLATFORM" = "android" ] && return 0
+  local udid="${QA_REVIEW_UDID:-}"
+  [ -n "$udid" ] || udid="$(xcrun simctl list devices booted 2>/dev/null | grep -oE '[0-9A-F-]{36}' | head -1)"
+  [ -n "$udid" ] || return 0
+  if ! xcrun simctl list devices 2>/dev/null | grep -F "$udid" | grep -q "(Booted)"; then
+    echo "qa-review: simulator $udid was not booted; booting it before the next flow"
+    xcrun simctl boot "$udid" >/dev/null 2>&1 || true
+    xcrun simctl bootstatus "$udid" -b >/dev/null 2>&1 || true
+    sleep 5
+  fi
+}
 REPO="" TAG="" FLOWS="" BUILD_REPORT=1
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -358,6 +374,7 @@ if [ "$PER_FLOW" = "1" ]; then
     if [ "$PLATFORM" != "web" ] && [ "$PLATFORM" != "android" ]; then
       pkill -9 -f UITests-Runner >/dev/null 2>&1 || true
       sleep 3
+      ensure_sim_booted
     fi
     echo "qa-review: [$name] running"
     run_flow "$RUN_DIR/result-$name.xml" "$f"
@@ -412,6 +429,7 @@ if [ "$RUN_SCENARIOS" = "1" ]; then
     fi
     art="$RUN_DIR/scenario-$sname"; rm -rf "$art"; mkdir -p "$art"
     [ "$PLATFORM" != "web" ] && [ "$PLATFORM" != "android" ] && { pkill -9 -f UITests-Runner >/dev/null 2>&1 || true; sleep 3; }
+    ensure_sim_booted
     echo "qa-review: [scenario $sname] running"
     set +e
     (cd "$REPO" && E2E_ARTIFACT_DIR="$art" with_timeout "${QA_REVIEW_SCENARIO_TIMEOUT:-2700}" bash -c "$scmd") > "$RUN_DIR/scenario-$sname.log" 2>&1
