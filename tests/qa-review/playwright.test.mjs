@@ -53,6 +53,13 @@ test('a spec run under several projects is one flow per project', () => {
   assert.match(read(d, 'result-access--client-finance.xml'), /<failure/);
 });
 
+test('a spec in one named project keeps its plain name', () => {
+  const a = tc('/repo/tests', 'public/sign-in.spec.ts', 'page renders', { project: 'public' });
+  const b = tc('/repo/tests', 'public/sign-in.spec.ts', 'empty form refused', { project: 'public' });
+  const d = run([[a, res('passed')], [b, res('passed')]]);
+  assert.equal(fs.existsSync(path.join(d, 'result-public-sign-in.xml')), true);
+});
+
 test('green on retry writes both files, so the report says passed on retry', () => {
   const t = tc('/repo/tests', 'login.spec.ts', 'signs in');
   const d = run([[t, res('failed', { message: 'slow' })], [t, res('passed', { retry: 1 })]]);

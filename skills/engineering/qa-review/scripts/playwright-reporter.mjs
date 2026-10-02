@@ -34,9 +34,8 @@ export default class QaReviewReporter {
     // Which specs run under more than one project: those get a project suffix.
     const projectsPerFile = new Map();
     for (const t of suite.allTests()) {
-      const project = this.projectOf(t);
       const set = projectsPerFile.get(t.location.file) || new Set();
-      set.add(project);
+      set.add(this.projectOf(t).name);
       projectsPerFile.set(t.location.file, set);
     }
     this.multiProject = new Set([...projectsPerFile].filter(([, set]) => set.size > 1).map(([file]) => file));
