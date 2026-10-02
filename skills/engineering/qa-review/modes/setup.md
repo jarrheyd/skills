@@ -43,7 +43,7 @@ From the templates, adapted to the real code:
 - One flow per top journey, following `references/conventions.md`
 - Screens missing testIDs: add them to the app code (one-line changes), list them in your summary
 
-## 5b. Make it regression-ready
+## 5b. Make the project ready for a regression run
 
 So `qa-review regression` is one repeatable command on this project:
 

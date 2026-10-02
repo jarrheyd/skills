@@ -2,11 +2,14 @@
 # qa-review suite runner. Runs Maestro flows for one project, on mobile (simulator)
 # or web (Chrome), into a fresh run dir under ~/.qa-review/<project>/runs, then
 # builds run-summary.json and report.html and prunes old runs.
+# A config with "runner": "playwright" runs the repo's Playwright suite instead of
+# Maestro and files its results the same way (references/playwright.md).
 #
 # Usage:
 #   qa-review-run.sh --repo <path> [--tag smoke] [--flows "a.yaml b.yaml"] [--no-build] [--resume] [--scenarios-only]
 #
-# Reads .maestro/qa-review.config.json in the repo:
+# Reads .maestro/qa-review.config.json in the repo (or qa-review.config.json at
+# the repo root when there is no .maestro folder):
 #   project, platform (mobile|web), appId|url, buildCmd, installCmd, simulator
 # Loads env from ~/.qa-review/<project>/.env (credentials, injected as maestro -e).
 #
@@ -79,6 +82,7 @@ fi
 # QA_REVIEW_CONFIG picks another config in the same repo (e.g. an Android one
 # beside the iOS default).
 CONFIG="${QA_REVIEW_CONFIG:-$REPO/.maestro/qa-review.config.json}"
+[ -n "${QA_REVIEW_CONFIG:-}" ] || [ -f "$CONFIG" ] || CONFIG="$REPO/qa-review.config.json"
 case "$CONFIG" in /*) ;; *) CONFIG="$(cd "$REPO" && pwd)/$CONFIG";; esac
 [ -f "$CONFIG" ] || { echo "qa-review: $CONFIG missing, run qa-review setup first" >&2; exit 1; }
 
@@ -88,6 +92,9 @@ APP_ID="$(jqget appId)"; URL="$(jqget url)"
 BUILD_CMD="$(jqget buildCmd)"; INSTALL_CMD="$(jqget installCmd)"
 SIMULATOR="$(jqget simulator)"; SIMULATOR="${SIMULATOR:-iPhone 17}"
 [ -n "$PROJECT" ] || { echo "qa-review: config has no project name" >&2; exit 1; }
+RUNNER="$(jqget runner)"; RUNNER="${RUNNER:-maestro}"
+# The manifest sits beside the config, wherever that is.
+MANIFEST="$(dirname "$CONFIG")/journeys.manifest.json"
 
 HOME_DIR="$HOME/.qa-review/$PROJECT"
 # --resume reuses the newest run dir so a suite that died mid-way (a wedged driver,
@@ -119,6 +126,83 @@ if [ -f "$HOME_DIR/.env" ]; then
   echo "qa-review: loaded $ENV_COUNT env vars from $HOME_DIR/.env"
 else
   echo "qa-review: NOTE no $HOME_DIR/.env found, flows needing credentials will fail"
+fi
+
+# Summary, report, prune, open: the same closing steps for every runner.
+finish_run() {
+  node "$SCRIPT_DIR/summarize-run.mjs" --run "$RUN_DIR"
+
+  if [ "$BUILD_REPORT" = "1" ]; then
+    GAPS=""; [ -f "$RUN_DIR/gaps.json" ] && GAPS="$RUN_DIR/gaps.json"
+    JUNITS="$(ls "$RUN_DIR"/result*.xml 2>/dev/null | tr '\n' ',' | sed 's/,$//')"
+    # The current run has no report.html yet, so the newest one on disk IS the
+    # previous run. Taking line 2 reached back two runs, which pruning to 2 runs
+    # usually deleted, so nothing was ever carried forward.
+    PREV="$(ls -t "$HOME_DIR"/runs/*/report.html 2>/dev/null | sed -n 1p || true)"
+    node "$SCRIPT_DIR/build-report.mjs" \
+      --project "$PROJECT" \
+      --manifest "$MANIFEST" \
+      --config "$CONFIG" \
+      --debug "$RUN_DIR/debug" \
+      --junit "$JUNITS" \
+      --out "$RUN_DIR/report.html" \
+      --build "run $(date +%Y-%m-%d\ %H:%M)" \
+      ${FINGERPRINT:+--buildinfo "$RUN_DIR/build.json"} \
+      ${GAPS:+--gaps "$GAPS"} \
+      ${PREV:+--previous "$PREV"}
+  fi
+
+  node "$SCRIPT_DIR/prune-runs.mjs" --project "$PROJECT" --keep "${QA_REVIEW_KEEP_RUNS:-2}"
+
+  # The report is the deliverable, so the runner opens it instead of leaving that
+  # to whoever called the runner. QA_REVIEW_NO_OPEN=1 to keep it closed.
+  if [ "$BUILD_REPORT" = "1" ]; then
+    "$SCRIPT_DIR/open-report.sh" "$RUN_DIR/report.html"
+  fi
+
+  echo "qa-review: done. Summary: $RUN_DIR/run-summary.json Report: $RUN_DIR/report.html"
+}
+
+write_fingerprint() { # arg: "<kind> <hash>", empty for none
+  if [ -n "$1" ]; then
+    node -e "
+      const fs=require('fs');
+      const [kind,...rest]=process.argv[1].split(' ');
+      fs.writeFileSync('$RUN_DIR/build.json', JSON.stringify({kind,hash:rest.join(' '),at:new Date().toISOString()},null,2)+'\\n');
+    " "$1"
+    echo "qa-review: build fingerprint ${1%% *} ${1##* }"
+  else
+    echo "qa-review: NOTE no build fingerprint for platform $PLATFORM; carried evidence will expire instead of counting green"
+  fi
+}
+
+# Playwright runner: the repo's own suite does the driving. Its config lists
+# scripts/playwright-reporter.mjs, which files one result per spec plus the
+# screenshots into this run dir. --tag becomes --grep @<tag>, --flows are spec
+# paths. The test repo's commit says nothing about the deployed build under
+# test, so the fingerprint comes from config "fingerprintCmd" (prints an id
+# for the build it found) or is left out.
+if [ "$RUNNER" = "playwright" ]; then
+  FP_CMD="$(jqget fingerprintCmd)"
+  FINGERPRINT=""
+  if [ -n "$FP_CMD" ]; then
+    FP="$(cd "$REPO" && eval "$FP_CMD" 2>/dev/null | tail -1 || true)"
+    [ -n "$FP" ] && FINGERPRINT="commit $FP"
+  fi
+  write_fingerprint "$FINGERPRINT"
+  PW_ARGS=()
+  [ -n "$TAG" ] && PW_ARGS+=(--grep "@$TAG")
+  [ "$RESUME" = "1" ] && PW_ARGS+=(--last-failed)
+  for f in $FLOWS; do PW_ARGS+=("$f"); done
+  echo "qa-review: playwright runner, npx playwright test ${PW_ARGS[*]:-}"
+  set +e
+  (cd "$REPO" && QA_REVIEW_RUN_DIR="$RUN_DIR" QA_REVIEW_PROJECT="$PROJECT" npx playwright test ${PW_ARGS[@]+"${PW_ARGS[@]}"})
+  SUITE_RC=$?
+  set -e
+  [ $SUITE_RC -eq 0 ] && echo "qa-review: playwright suite passed" || echo "qa-review: playwright suite had failures (rc=$SUITE_RC)"
+  ls "$RUN_DIR"/result*.xml >/dev/null 2>&1 || { echo "qa-review: no results in $RUN_DIR. Is scripts/playwright-reporter.mjs in the Playwright config's reporter list?" >&2; exit 1; }
+  finish_run
+  exit 0
 fi
 
 export PATH="$PATH:$HOME/.maestro/bin"
@@ -242,16 +326,7 @@ build_fingerprint() {
   esac
 }
 FINGERPRINT="$(build_fingerprint || true)"
-if [ -n "$FINGERPRINT" ]; then
-  node -e "
-    const fs=require('fs');
-    const [kind,...rest]=process.argv[1].split(' ');
-    fs.writeFileSync('$RUN_DIR/build.json', JSON.stringify({kind,hash:rest.join(' '),at:new Date().toISOString()},null,2)+'\n');
-  " "$FINGERPRINT"
-  echo "qa-review: build fingerprint ${FINGERPRINT%% *} ${FINGERPRINT##* }"
-else
-  echo "qa-review: NOTE no build fingerprint for platform $PLATFORM; carried evidence will expire instead of counting green"
-fi
+write_fingerprint "$FINGERPRINT"
 
 # Flow selection in bash (mirrors the production suites): glob flows/*.yaml,
 # skip _partials, keep everything or only files whose tag block contains TAG.
@@ -440,32 +515,4 @@ if [ "$RUN_SCENARIOS" = "1" ]; then
   done < <(node "$SCRIPT_DIR/scenarios.mjs" "$CONFIG" list)
 fi
 
-node "$SCRIPT_DIR/summarize-run.mjs" --run "$RUN_DIR"
-
-if [ "$BUILD_REPORT" = "1" ]; then
-  JUNITS="$(ls "$RUN_DIR"/result*.xml 2>/dev/null | tr '\n' ',' | sed 's/,$//')"
-  # The current run has no report.html yet, so the newest one on disk IS the
-  # previous run. Taking line 2 reached back two runs, which pruning to 2 runs
-  # usually deleted, so nothing was ever carried forward.
-  PREV="$(ls -t "$HOME_DIR"/runs/*/report.html 2>/dev/null | sed -n 1p || true)"
-  node "$SCRIPT_DIR/build-report.mjs" \
-    --project "$PROJECT" \
-    --manifest "$REPO/.maestro/journeys.manifest.json" \
-    --config "$CONFIG" \
-    --debug "$RUN_DIR/debug" \
-    --junit "$JUNITS" \
-    --out "$RUN_DIR/report.html" \
-    --build "run $(date +%Y-%m-%d\ %H:%M)" \
-    ${FINGERPRINT:+--buildinfo "$RUN_DIR/build.json"} \
-    ${PREV:+--previous "$PREV"}
-fi
-
-node "$SCRIPT_DIR/prune-runs.mjs" --project "$PROJECT" --keep "${QA_REVIEW_KEEP_RUNS:-2}"
-
-# The report is the deliverable, so the runner opens it instead of leaving that
-# to whoever called the runner. QA_REVIEW_NO_OPEN=1 to keep it closed.
-if [ "$BUILD_REPORT" = "1" ]; then
-  "$SCRIPT_DIR/open-report.sh" "$RUN_DIR/report.html"
-fi
-
-echo "qa-review: done. Summary: $RUN_DIR/run-summary.json Report: $RUN_DIR/report.html"
+finish_run

@@ -44,6 +44,8 @@ The proof always wears the target app's brand. Every public mode runs `scripts/d
 
 `qa-review.config.json` (committed, no secrets): `{ "project": "<name>", "platform": "mobile|android|web", "appId" | "url", "buildCmd", "installCmd", "errorCopy": ["..."], "envKeys": ["QA_REVIEW_USER", ...] }`
 
+A web repo with a Playwright suite sets `"runner": "playwright"` and keeps the config and manifest at the repo root; no Maestro flows. See `references/playwright.md`.
+
 Optional keys: `seedCmd` (resets test data before each run; its `KEY=VALUE` output lines are merged into the local `.env`), `excludeFlows` (globs for throwaway flows kept out of the suite), `designDoc` and `uiRules` (what the UI and consistency pass checks screens against).
 
 ## Hard rules (every mode)
@@ -76,5 +78,6 @@ Follow `references/conventions.md` for every flow you write or edit. Short versi
 | `references/verdicts.md` | Crosscheck verdict definitions + evidence bar |
 | `references/product-rubric.md` | The `--product` UX review rubric |
 | `references/web-driving.md` | Maestro on web: url config, selectors, quirks |
+| `references/playwright.md` | Playwright runner: a web suite written in Playwright, filed and reported by qa-review |
 | `references/ui-consistency.md` | The UI and consistency pass: every captured screen checked against the design doc and `uiRules`, findings with severity |
 | `references/regression-report.md` | Flows as a numbered regression-test-case matrix, failure classification (crash / defect / flow-rot / env), flow freshness, crash and freeze capture, the production-readiness line |

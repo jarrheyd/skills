@@ -25,11 +25,34 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ -n "$REPO" ] || { echo "qa-review-regression: --repo <path> required" >&2; exit 1; }
-PROJECT="$(node -e "process.stdout.write(require('$REPO/.maestro/qa-review.config.json').project)")"
+REPO="$(cd "$REPO" && pwd)"
+CONFIG="${QA_REVIEW_CONFIG:-$REPO/.maestro/qa-review.config.json}"
+[ -n "${QA_REVIEW_CONFIG:-}" ] || [ -f "$CONFIG" ] || CONFIG="$REPO/qa-review.config.json"
+case "$CONFIG" in /*) ;; *) CONFIG="$REPO/$CONFIG";; esac
+export QA_REVIEW_CONFIG="$CONFIG"
+PROJECT="$(node -e "process.stdout.write(require('$CONFIG').project)")"
+RUNNER="$(node -e "process.stdout.write(require('$CONFIG').runner||'maestro')")"
 HOME_DIR="$HOME/.qa-review/$PROJECT"
 
-echo "== freshness"
-node "$SCRIPT_DIR/check-flow-freshness.mjs" --repo "$REPO" || true
+# The suite: Maestro flow files, or for the Playwright runner every journey in
+# the manifest that is not marked planned.
+suite() {
+  if [ "$RUNNER" = "playwright" ]; then
+    node -e "const m=require('$(dirname "$CONFIG")/journeys.manifest.json');process.stdout.write((m.journeys||[]).filter(j=>!j.planned).map(j=>j.flow).join('\n'))"
+  else
+    node "$SCRIPT_DIR/config-glob.mjs" "$CONFIG" suite "$REPO/.maestro/flows"
+  fi
+}
+
+if [ "$RUNNER" = "playwright" ]; then
+  echo "== freshness: skipped (a Playwright spec fails on a stale selector by itself)"
+  # A Playwright run does not wedge half-way like a device driver, so there is
+  # nothing to resume: a spec with no result did not run, and that is reported.
+  MAX_RESUMES=0
+else
+  echo "== freshness"
+  node "$SCRIPT_DIR/check-flow-freshness.mjs" --repo "$REPO" || true
+fi
 
 if [ "$CONTINUE" = "1" ]; then
   echo "== continuing the newest run"
@@ -45,10 +68,10 @@ missing() {
   while read -r f; do
     [ -z "$f" ] && continue
     [ -f "$RUN_DIR/result-${f%.yaml}.xml" ] || [ -f "$RUN_DIR/result-retry-${f%.yaml}.xml" ] || n=$((n+1))
-  done < <(node "$SCRIPT_DIR/config-glob.mjs" "$REPO/.maestro/qa-review.config.json" suite "$REPO/.maestro/flows")
+  done < <(suite; echo)
   echo "$n"
 }
-for i in $(seq 1 "$MAX_RESUMES"); do
+[ "$MAX_RESUMES" -gt 0 ] && for i in $(seq 1 "$MAX_RESUMES"); do
   m="$(missing)"
   [ "$m" = "0" ] && break
   echo "== resume $i: $m flow(s) without a result"
@@ -68,7 +91,7 @@ while read -r f; do
   elif [ -f "$x" ] && ! grep -q "<failure\|<error" "$x"; then pass=$((pass+1))
   elif [ -f "$x" ] || [ -f "$r" ]; then fail=$((fail+1)); failed="$failed $n"
   fi
-done < <(node "$SCRIPT_DIR/config-glob.mjs" "$REPO/.maestro/qa-review.config.json" suite "$REPO/.maestro/flows")
+done < <(suite; echo)
 echo "passed: $pass  failed: $fail  without a result: $(missing)"
 [ -n "$failed" ] && echo "failed:$failed"
 echo "next: classify each red, repair stale flows, run the UI pass, publish (modes/regression.md)"

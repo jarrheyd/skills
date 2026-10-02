@@ -95,6 +95,8 @@ Keep test runs out of product analytics. Before the first regression, make the a
 | `appId` / `url` | yes | Dev or staging bundle id, or web URL. Production is refused |
 | `simulator` | iOS | Device name to boot or reuse |
 | `buildCmd`, `installCmd` | recommended | Build and install the current code. `installCmd` can target `${QA_REVIEW_UDID}` |
+| `runner` | optional | `playwright` runs the repo's Playwright suite instead of Maestro flows (`references/playwright.md`) |
+| `fingerprintCmd` | optional | Playwright runner: prints an id for the deployed build under test |
 | `seedCmd` | recommended | Resets test data before each run. Its `KEY=VALUE` output lines go into the local `.env` for the flows |
 | `excludeFlows` | optional | Globs for throwaway flows kept out of the suite |
 | `flowSetup` | optional | `{ "glob": "command" }`: prepares one flow's own data right before it; the output reaches only that flow |
