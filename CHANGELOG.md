@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.2.0
+
+### Minor Changes
+
+- [`4509b65`](https://github.com/jarrheyd/skills/commit/4509b65e05d1980da1d880330dd5cafaec4beda7) Thanks [@jarrheyd](https://github.com/jarrheyd)! - deslop: the copy hook now blocks interface copy that explains itself (a line that tells the reader to click here, that says what a page shows, or a sign-in subtitle listing what is behind it), reading raw JSX text as well as string literals. The review gate and the slop-detector agent gain an interface pass: delete every subtitle, helper line and caption a first-time user can do without.
+
+- [`20e6cea`](https://github.com/jarrheyd/skills/commit/20e6ceaf3aceffb1c8141db23d5abf3f029a7cd1) Thanks [@jarrheyd](https://github.com/jarrheyd)! - deslop: the copy hook now blocks a bold line used as a section label on three or more blocks, three short sentences in a row of about the same length, and a paragraph that ends on a short abstract closing line.
+
+- [`7c1510a`](https://github.com/jarrheyd/skills/commit/7c1510a40cb4eb3f6db6db71e10cd5fbac886f92) Thanks [@jarrheyd](https://github.com/jarrheyd)! - qa-review: a web repo can set `"runner": "playwright"`. The runner then calls the repo's Playwright suite instead of Maestro, and `scripts/playwright-reporter.mjs` files one result per spec plus the screenshots so the same report builds from it. Config and manifest can sit at the repo root.
+
 ## 2.1.0
 
 ### Minor Changes
