@@ -111,6 +111,7 @@ Before shipping any screen, verify:
 - [ ] Spacing has contrast (dense + spacious, not uniform)
 - [ ] All states designed: empty, error, loading, edge cases
 - [ ] A screenshot alone communicates which brand this is
+- [ ] No subtitle, helper line or caption that explains the screen. Delete each one and check a first-time user can still do the task (see "Interface copy that explains itself" in the copy dictionary)
 
 ## AI design tells - full checklist (2026-08-27)
 

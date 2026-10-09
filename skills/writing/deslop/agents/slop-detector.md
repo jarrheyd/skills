@@ -21,6 +21,10 @@ Volume is the tell the word lists miss. A document can contain no banned phrase 
 
 Report the current word count and the count after the cuts you propose.
 
+## Interface pass
+
+For any UI (a screen, a component, a mockup), list every visible string that is neither a label, a value, an error, nor a required legal line. For each, ask whether a first-time user could still do the task with it deleted. If yes, report it as a violation with the fix "delete". The interface-copy section of `references/copy-slop-dictionary.md` lists the usual finds: subtitles under headings, helper lines under buttons, numbered how-to steps, reassurance, and captions that restate a chart.
+
 ## Output
 
 Slop score, 0 to 100 (0 = no tells, 100 = obviously generated):

@@ -86,6 +86,30 @@ The pattern "Word: rest of sentence" used as pseudo-heading mid-paragraph:
 - "The catch: ..."
 - "The kicker: ..."
 
+### Interface copy that explains itself (added 2026-10-08)
+Apps do not explain everything. A model asked to build a screen writes a heading, then a subtitle restating the heading as an instruction, then a helper line under each control. Real products ship the label and stop.
+
+Blocked by the hook (any file, including raw JSX text):
+- "Click here to ..." / "Tap the button below to ..."
+- "Here you can find ..." / "Below you will find ..."
+- "Use this page to ..." / "This page lets you ..." / "This section shows ..."
+- "Sign in to see your ..." / "Log in to access your ..."
+
+Judgment, for the review (the hook cannot tell a label from a subtitle):
+- A subtitle under a heading that says what the screen is for. "Statements" needs no "View and download your statements".
+- "View your ...", "Manage your ...", "Track your ..." as body text. As a button label, fine.
+- Helper text that restates the control: "You need your username and invitation code" above fields labelled Username and Invitation code.
+- Numbered steps for something the next screen already walks through.
+- Reassurance: "Your data is safe with us", "This only takes a minute", "Don't worry".
+- Self-written disclaimers and "Please note" lines. Keep only what a regulator or a lawyer requires.
+- Empty states that explain the feature. Say what is empty in a few words, offer the one action.
+- Captions that describe the chart above them, tooltips that repeat the label, placeholder text that repeats the field label.
+- "Need help? Contact ..." repeated on every screen. Once, where help lives.
+
+Keep: labels, values, units, dates and "as of" stamps, errors that say what to do next, required legal lines, one short line before an action that cannot be undone, and a device hint only where the next thing that happens would surprise.
+
+The test: delete the line. If a first-time user can still do the task, it stays deleted. Accessible names (aria-label, alt, screen-reader text) are not visible copy and stay.
+
 ### Rhetorical-Question Pile-Ups
 Stacking two or three short rhetorical questions with no answer is an AI tic:
 - "Top? Bottom? Both ends?"

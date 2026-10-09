@@ -39,6 +39,7 @@ Every pattern is a regex in `copy_slop_hook.py`; the literal list, with fixes, i
 - Tool remnants: citation tokens and tracking parameters leaked from the generating tool.
 - Typography: em dashes (including HTML entities), curly quotes, middot separators, Title Case headings, bold as decoration, a period-terminated bold fragment used as a paragraph title.
 - Explainer headings that gloss the artifact instead of naming the subject.
+- Interface narration: a line that says what a screen is for or how to press a control. In JSX and templates it reads the raw source, since visible text sits outside quotes.
 - Restatement: two adjacent sentences or bullets sharing 90 percent of their content words. Parallel lists with different values pass.
 - Hyphenated-compound titles, three adjectives in a row, and the law of threes (three one-word sentences, or a sentence that closes on three single-word items).
 - Hook-and-reveal rhythms: the elliptical setup (a two-word question as a drumroll, then the answer), the suspense-then-answer, the unneeded justifier before a point, the revelation hook (the thing nobody supposedly says), the big-reveal frame (what a thing supposedly is underneath), and overhype (claims of changing everything or starting a revolution).
@@ -73,6 +74,8 @@ Patterns caught by comparing AI drafts with what a person actually sent in the s
 15. Explainer furniture. A heading that glosses the artifact instead of naming the subject, and a footer caption that re-explains the slide above it.
 16. Unranked points in an argument. An inventory (a sweep, a ledger, a roll-up) is exhaustive and flat by design. A thesis document (memo, proposal, decision doc) that reads flat has not found its argument: surface the three points that carry the decision, demote the rest.
 
+17. An interface that explains itself. A subtitle under every heading, a helper line under every button, numbered steps for a two-tap flow, a caption restating the chart, a disclaimer nobody asked for. Apps people use daily carry almost none of it. Test each line: delete it, and if a first-time user can still do the task, it stays deleted. What survives is functional: labels, values, dates, errors that say what to do next, legal lines a regulator requires, and one short line before an action that cannot be undone.
+
 ## Review gate after every implementation
 
 Before presenting a feature, a document, a design, copy, or UI:
@@ -80,8 +83,9 @@ Before presenting a feature, a document, a design, copy, or UI:
 1. Sweep the user-facing surfaces: copy, docs, UI choices, generated designs, commit-adjacent prose.
 2. Apply the five questions below, the tells above, and the relevant reference file.
 3. Cut to roughly half the words while keeping every point, silently. Present only the cut version; never show a before-and-after or mention the cut.
-4. Client-facing, published, or written in someone's voice: run the slop-detector agent.
-5. Fix what it finds, then present. Never present with a "might be sloppy" caveat.
+4. Any UI: read every visible string on every screen and delete the ones that explain, instruct, or reassure. See tell 17 and the interface-copy section of `references/copy-slop-dictionary.md`.
+5. Client-facing, published, or written in someone's voice: run the slop-detector agent.
+6. Fix what it finds, then present. Never present with a "might be sloppy" caveat.
 
 ## Airless prose (review-only)
 

@@ -256,6 +256,32 @@ EXPLAINER_HEADINGS = [
      "why-it-matters heading: state the stake itself, not that there is one"),
 ]
 
+# BLOCKING: interface copy that narrates itself (added 2026-10-08)
+#
+# An app does not explain itself. A subtitle that says what the screen is for, or a line
+# that tells the reader how to press a control, is the machine default: every screen gets a
+# heading, then a sentence restating the heading as an instruction. Deliberately narrow:
+# only shapes that are never a label or a real error. "View statements" as a button passes;
+# "Click here to view your statements" blocks. The wider judgment (any subtitle that is not
+# functional) lives in references/copy-slop-dictionary.md for the review.
+# ============================================================
+INTERFACE_NARRATION = [
+    (r"(?i)\b(?:click|tap|press)\s+(?:here|below|the\s+(?:button|link)(?:\s+below)?)\s+to\b",
+     "interface narration: 'click here to' - name the action on the control and drop the sentence"),
+    (r"(?i)\bhere\s+you(?:\s+can|\s+will|'ll)\s+(?:find|see|view|manage|access)\b",
+     "interface narration: 'here you can find' - the screen shows it; delete the line"),
+    (r"(?i)\b(?:use|visit)\s+this\s+(?:page|screen|section|tab|form)\s+to\b",
+     "interface narration: 'use this page to' - the heading names the page; delete the line"),
+    (r"(?i)\bthis\s+(?:page|screen|section|tab|dashboard)\s+(?:lets|allows|enables|helps)\s+you\b",
+     "interface narration: 'this page lets you' - delete the line"),
+    (r"(?i)\bthis\s+(?:page|screen|section|tab|dashboard)\s+(?:shows|displays|lists|contains)\b",
+     "interface narration: 'this page shows' - the content is on the page; delete the line"),
+    (r"(?i)\b(?:sign|log)\s+in\s+to\s+(?:see|view|access|manage)\s+your\b",
+     "interface narration: 'sign in to see your' - the sign-in button is enough; delete the subtitle"),
+    (r"(?i)\bbelow\s+(?:you(?:'ll|\s+will|\s+can)\s+(?:find|see)|is\s+a\s+(?:list|summary|breakdown)\s+of)\b",
+     "interface narration: 'below you will find' - delete the line and show the thing"),
+]
+
 # BLOCK: a comma in a short display heading (added 2026-09-16). The rule: if a headline
 # needs a comma it is usually two ideas and too long. Scoped to short headings so long
 # list-style headings and ordinary doc headings are spared. Excluded, to match the
@@ -717,6 +743,17 @@ def check_explainer_headings(content):
     return violations
 
 
+def check_interface_narration(content):
+    """BLOCK: a line that explains the interface or tells the reader how to use a control."""
+    violations = []
+    for i, line in enumerate(content.split("\n"), 1):
+        for pattern, msg in INTERFACE_NARRATION:
+            if re.search(pattern, line):
+                violations.append((i, f"[BLOCK] {msg}"))
+                break
+    return violations
+
+
 def _content_words(text):
     """Lowercased meaningful tokens: drops stopwords, punctuation, and short words.
 
@@ -994,13 +1031,18 @@ def main():
     if not content:
         sys.exit(0)
 
-    # For source files, only check string literals
+    # For source files, only check string literals. Interface narration is the exception:
+    # in JSX and templates the visible text sits outside quotes, so it reads the raw source.
+    narration = []
     if is_source_file(file_path):
+        narration = check_interface_narration(content)
         content = extract_string_literals(content)
-        if not content:
+        if not content and not narration:
             sys.exit(0)
     elif not is_prose_file(file_path):
         sys.exit(0)
+    else:
+        narration = check_interface_narration(content)
 
     # HTML entities hide slop from the character-based checks: &mdash; (and &#8212; / &#x2014;)
     # is an em dash, &middot; a middot, &rsquo; a curly quote. Decode them so encoded slop
@@ -1032,7 +1074,7 @@ def main():
     if EM_DASH in content:
         emdash_blocks = [(0, f"[BLOCK] em dash present ({content.count(EM_DASH)}x) - banned outright; use a hyphen, comma, or period")]
 
-    all_blocks = (banned + curly + titlecase + bold + boldlead + middot + explainer
+    all_blocks = (banned + curly + titlecase + bold + boldlead + middot + explainer + narration
                   + restate + tics + weak_blocks + density_blocks + emdash_blocks + filler_blocks)
 
     if all_blocks:

@@ -73,6 +73,14 @@ BLOCKS = [
     ("no x no y just z", "No meetings, no email, just work."),
     ("law of threes words", "Fast. Cheap. Done."),
     ("law of threes list", "It was fast, cheap, reliable."),
+    ("click here to", "Click here to view your statements."),
+    ("tap the button below", "Tap the button below to continue."),
+    ("here you can find", "Here you can find all of your accounts."),
+    ("use this page to", "Use this page to manage your passkeys."),
+    ("this page lets you", "This page lets you review a recommendation."),
+    ("this section shows", "This section shows your holdings by asset class."),
+    ("sign in to see your", "Sign in to see your portfolio and your documents."),
+    ("below you will find", "Below you will find the transactions for the month."),
     ("three adjectives mid", "A specific, careful, deliberate plan."),
     ("emoji bullet", "🚀 Ship faster"),
     ("emoji list bullet", "- ✅ done"),
@@ -122,6 +130,16 @@ class CopyHook(unittest.TestCase):
         src = 'const x = "In today\'s fast-paced world we ship faster";'
         self.assertEqual(run(src, path="app.ts")[0], 2)
         self.assertEqual(run("// In today's fast-paced world", path="app.ts")[0], 0)
+
+    def test_interface_narration_read_from_jsx_text(self):
+        code, err = run("export const A = () => <p>Click here to view your statements</p>;\n", path="a.tsx")
+        self.assertEqual(code, 2, err)
+        self.assertIn("interface narration", err)
+
+    def test_plain_labels_pass(self):
+        for text in ("View statements", "Sign in", "Set up your passkey", "Wrong code. 2 tries left."):
+            code, err = run(f"export const A = () => <button>{text}</button>;\n", path="a.tsx")
+            self.assertEqual(code, 0, f"{text!r} should pass: {err}")
 
     def test_edit_tool_checks_new_string(self):
         self.assertEqual(run("Unlock the power of X", tool="Edit")[0], 2)
