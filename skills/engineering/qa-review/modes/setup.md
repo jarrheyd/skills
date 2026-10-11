@@ -1,0 +1,89 @@
+# qa-review setup
+
+Bootstrap a project for qa-review. Code first: the app's source tells you the screens, routes, and selectors; ask the user only what code cannot answer. End state: a committed `.maestro/` with config, manifest, and green starter flows.
+
+No codebase access (a tester with only a URL or a build)? Use `--blackbox`: skip steps 3 and parts of 5, follow the "Blackbox setup" section at the end instead. Everything else (prerequisites, config, .env, run-until-green) is identical.
+
+## 1. Prerequisites
+
+Check and report, fix what you can:
+
+- `maestro` on PATH (`~/.maestro/bin`). Missing: `curl -fsSL "https://get.maestro.mobile.dev" | bash`
+- Java runtime (`java -version`). Missing on macOS: `brew install --cask temurin` (needs the user or brew permission)
+- iOS: Xcode + at least one available simulator (`xcrun simctl list devices available`). Android: `adb devices` shows one online. Web: nothing extra.
+
+## 2. Detect the platform
+
+React Native / Expo / iOS project: `platform: mobile`. Android-only, or a mobile project you will drive on an emulator: `platform: android`. Next/React/Vue/anything served over HTTP: `platform: web`. Monorepos with both: ask which surface to cover first; one config per surface.
+
+## 3. Explore the code
+
+Map, without asking the user:
+
+- Screens/routes: navigators, route tables, page directories
+- Existing testIDs / data-testids (grep `testID=` / `data-testid=`)
+- The error-state components and their LITERAL user-facing copy (this feeds `errorCopy` and every `assertNotVisible`)
+- The login screen's inputs and their ids
+- Any existing e2e setup to reuse rather than duplicate
+
+## 4. Ask the user (one short round)
+
+Only: target env URL or appId + how to build/install (or an existing build to reuse), which test account keys exist, and the 3 to 5 journeys that matter most if they have an opinion. Then:
+
+- Write `.maestro/qa-review.config.json` from `templates/qa-review.config.json`
+- Create `~/.qa-review/<project>/.env` with PLACEHOLDER lines for each key in `envKeys` (`QA_REVIEW_USER=fill-me`); tell the user to fill it. Never ask for the values in chat.
+
+## 5. Generate
+
+From the templates, adapted to the real code:
+
+- `journeys.manifest.json`: every mapped screen area as a category; the top journeys as entries; everything you could not build yet as `planned: true` so the report shows the full plan
+- `flows/screen-walk.yaml`: visit every top-level screen, the real `errorCopy` strings after each, numbered screenshots
+- `flows/_login.yaml`: the project's actual login inputs and post-login anchor
+- One flow per top journey, following `references/conventions.md`
+- Screens missing testIDs: add them to the app code (one-line changes), list them in your summary
+
+## 5b. Make the project ready for a regression run
+
+So `qa-review regression` is one repeatable command on this project:
+
+- Test data: if the repo has a seed or fixture script, set `seedCmd` to it. It must first clear what earlier runs left on the test accounts (created pages, groups, posts, invites), then create fresh data and print the ids flows need as `KEY=VALUE` lines. Without the reset, leftovers pile up and cause duplicate-name prompts, long lists and flaky pickers. Flows that create things should name them with a timestamp so the reset can find exactly those. No script yet: write a small one over the API.
+- Ordered scenarios: existing scripts that run several flows in order with API steps between (`run-*.sh` and similar) go into `scenarios` with the flows each one runs, plus `scenarioEnv`. A flow that only needs its own data prepared goes in `flowSetup` instead.
+- Throwaway flows (screenshot scripts, one-off checks) go in `excludeFlows`.
+- Analytics: if the app sends product analytics, make it skip a simulator or emulator, and have the backend skip test accounts, before the first run. Ask before changing app code; say plainly in the report if it could not be done.
+- UI rules: point `designDoc` at the design system doc and add 5 to 12 `uiRules`, one checkable sentence each (casing, button labels, loader, card consistency, one primary per area).
+- Run `node scripts/qa-review-doctor.mjs --repo <repo>` and fix every FAIL.
+
+## 6. Run until green
+
+`scripts/qa-review-run.sh --repo <repo>` (guard-env runs inside it). Read `run-summary.json`. For each failure open ONLY that flow's last screenshot, fix the selector or flow, rerun just that flow (`--flows`). Loop until green or genuinely blocked (unfilled .env, env down); blocked is reported, not worked around.
+
+## 7. Finish
+
+Commit `.maestro/` (flows, manifest, config, plus any testIDs added to app code) with the user's normal commit conventions. Open `report.html`. Summarize: flows built, flows planned, testIDs added, what the user still owes (creds, approvals).
+
+## Process hygiene (node-leak guard)
+
+Test and build runs (nx, jest, dev servers) orphan to launchd (ppid=1) when the launching session dies, and pile up in swap until the Mac hits "out of application memory". qa-review-run.sh sweeps these on exit via `~/.claude/scripts/reap-node-leaks.sh`. That backstop should also run on a timer, independent of any session:
+
+```bash
+cp ~/.claude/scripts/com.jarrhey.reap-node-leaks.plist ~/Library/LaunchAgents/ && launchctl load ~/Library/LaunchAgents/com.jarrhey.reap-node-leaks.plist
+```
+
+Runs every 5 min, kills only orphans (dead-parent nx daemons/jest, dev servers with no listener), logs to `~/.claude/scripts/reap.log`. One-off sweep: `bash ~/.claude/scripts/reap-node-leaks.sh`.
+
+## Blackbox setup (--blackbox: no codebase access)
+
+For when the person has only a running app: a staging URL (web) or an installable build like a TestFlight/apk/.app (mobile). Maestro never needed source to drive; only the exploration changes.
+
+With no repo to commit into, the `.maestro/` folder (config, manifest, flows) lives in `~/.qa-review/<project>/workspace/` instead; qa-review-run.sh takes it via `--repo ~/.qa-review/<project>/workspace`. If the person later gets repo access, move the folder in and commit it.
+
+Discovery, in place of code exploration:
+
+- Web: crawl from the entry URL. Visit each screen, note its heading, its links/buttons, and where they lead; the crawl becomes the screen map and the manifest categories. Stay inside the target host; skip logout and destructive-looking actions during discovery.
+- Mobile: install the build, walk it manually with a discovery flow (tap through tabs and menus, `takeScreenshot` each screen). `maestro hierarchy` dumps the accessibility tree per screen; harvest ids from it when the app ships accessibility identifiers, text otherwise.
+- If a QA test script exists, ingest it first (crosscheck mode step 1): it already names the screens, steps, and expected results, and is a better map than a blind crawl.
+
+Selector rules shift one notch: accessibility ids first when the hierarchy exposes them, visible text second, and every text selector gets a comment naming the screen so rot is easy to fix. Error detection falls back to generic strings ("Something went wrong", "Error", "Unable to", the platform's crash dialog) plus a screenshot after every screen; say in the manifest intro that error assertions are generic.
+
+Label the output honestly: set `"blackbox": true` in qa-review.config.json, and prefix the manifest intro with "Built without codebase access". Gap analysis in audit mode then compares against the test script or the crawl map only, and the report must say so; never present blackbox coverage as code-grounded.

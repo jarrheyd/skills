@@ -1,0 +1,17 @@
+{
+  "name": "jarrheyd",
+  "owner": {
+    "name": "Jarrhey De la Pena",
+    "url": "https://jarrhey.com"
+  },
+  "description": "Jarrhey De la Pena's agent skills as an installable Claude Code plugin.",
+  "plugins": [
+    {
+      "name": "jarrheyd-skills",
+      "source": "./",
+      "description": "deslop (AI-slop gate), qa-review (Maestro e2e audits), product-review (built vs intended).",
+      "category": "productivity",
+      "keywords": ["deslop", "ai-slop", "qa", "e2e", "maestro", "product-review"]
+    }
+  ]
+}

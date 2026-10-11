@@ -1,0 +1,694 @@
+#!/usr/bin/env node
+// qa-review report builder. Deterministic and dependency-free: pairs the manifest
+// copy with the screenshots Maestro captured per step and the JUnit pass/fail,
+// and emits ONE self-contained HTML page. Zero AI tokens per build.
+//
+// "Last reviewed" is persisted per journey in ~/.qa-review/<project>/.report-state.json
+// and only bumped for journeys that actually ran this time, so a partial run
+// leaves the others showing their older, honest date.
+//
+//   node build-report.mjs \
+//     --project  <name>                      (resolves ~/.qa-review/<name>/ paths)
+//     --manifest <journeys.manifest.json>
+//     --config   <qa-review.config.json>         (platform: mobile|web, errorCopy...)
+//     --debug    <maestro debug output dir>  (default: newest run under ~/.qa-review/<name>/runs)
+//     --junit    <result.xml[,result2.xml]>  (pass/fail per flow; authoritative)
+//     --out      <report.html>               (default: <run>/report.html)
+//     --state    <.report-state.json>
+//     --crosscheck <crosscheck.json>         (optional verdict-matrix section)
+//     --gaps       <gaps.json>               (optional coverage-gap section)
+//     --product    <product-notes.json>      (optional UX-findings section)
+//     --build    "pre-deploy 2026-08-31"     (footer label)
+//     --shots    12                          (max screenshots per journey)
+//     --previous <older report.html>         (carry reels forward for flows not run)
+//     --buildinfo <run>/build.json           (what was under test, from the runner)
+//     --carrydays 7                          (how long carried evidence counts green)
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { execFileSync } from 'node:child_process';
+
+const args = Object.fromEntries(
+  process.argv.slice(2).reduce((a, v, i, arr) => (v.startsWith('--') ? [...a, [v.slice(2), arr[i + 1]]] : a), []),
+);
+const die = (m) => { console.error(`build-report: ${m}`); process.exit(1); };
+
+const project = args.project || process.env.QA_REVIEW_PROJECT;
+const home = project ? path.join(os.homedir(), '.qa-review', project) : null;
+if (!args.manifest) die('--manifest is required');
+const manifest = JSON.parse(fs.readFileSync(args.manifest, 'utf8'));
+const config = args.config && fs.existsSync(args.config) ? JSON.parse(fs.readFileSync(args.config, 'utf8')) : {};
+const isWeb = (config.platform || 'mobile') === 'web';
+
+// ---- brand theme (from detect-brand.mjs) -----------------------------------
+// The proof wears the target app's own brand: colors, light/dark base, fonts,
+// logo. Missing brand.json => the neutral default palette below, so it never fails.
+const brand = (() => {
+  const p = args.brand || (home && path.join(home, 'brand.json'));
+  try { return p && fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : null; } catch { return null; }
+})();
+const MIME = { '.ttf': 'font/ttf', '.otf': 'font/otf', '.woff': 'font/woff', '.woff2': 'font/woff2' };
+// Embed a small curated set of the app's font files (a few weights) as @font-face
+// data URIs so the single HTML file renders in the app's type anywhere.
+function fontFaces() {
+  if (!brand?.fonts?.files?.length) return { css: '', sans: null, heading: null, accent: null };
+  const files = brand.fonts.files.filter((f) => fs.existsSync(f));
+  const famOf = (n) => path.basename(n).toLowerCase();
+  const wantWeight = (n) => /(regular|medium|semibold|bold)\b/i.test(n) || !/(light|thin|italic|black|extra)/i.test(n);
+  const roleFiles = (fam) => {
+    if (!fam) return [];
+    const key = fam.toLowerCase().replace(/[^a-z]/g, '');
+    return files.filter((f) => famOf(f).replace(/[^a-z]/g, '').startsWith(key.slice(0, 6)) && wantWeight(f)).slice(0, 3);
+  };
+  const roles = [['BrandSans', brand.fonts.sans], ['BrandHeading', brand.fonts.heading], ['BrandAccent', brand.fonts.accent]];
+  let css = '';
+  const seen = new Set();
+  const present = {};
+  for (const [css_family, fam] of roles) {
+    const picks = roleFiles(fam);
+    if (!picks.length) continue;
+    present[css_family] = true;
+    for (const f of picks) {
+      const ext = path.extname(f).toLowerCase();
+      const weight = /bold/i.test(f) ? 700 : /semibold/i.test(f) ? 600 : /medium/i.test(f) ? 500 : 400;
+      const id = `${css_family}-${weight}`;
+      if (seen.has(id)) continue; seen.add(id);
+      try {
+        const b = fs.readFileSync(f).toString('base64');
+        css += `@font-face{font-family:'${css_family}';font-weight:${weight};font-display:swap;src:url(data:${MIME[ext] || 'font/ttf'};base64,${b});}\n`;
+      } catch {}
+    }
+  }
+  return { css, sans: present.BrandSans ? 'BrandSans' : null, heading: present.BrandHeading ? 'BrandHeading' : null, accent: present.BrandAccent ? 'BrandAccent' : null };
+}
+const FF = fontFaces();
+const SANS = FF.sans ? `'${FF.sans}',` : '';
+const HEAD = FF.heading ? `'${FF.heading}',` : (FF.sans ? `'${FF.sans}',` : '');
+const ACCENT_FONT = FF.accent ? `'${FF.accent}',` : HEAD;
+// Logo: inline an SVG, or data-URI a PNG, into the header.
+function logoHtml() {
+  const p = brand?.logo; if (!p || !fs.existsSync(p)) return '';
+  const ext = path.extname(p).toLowerCase();
+  try {
+    if (ext === '.svg') { const s = fs.readFileSync(p, 'utf8').replace(/<\?xml[^>]*\?>/, '').trim(); return `<span class="logo">${s}</span>`; }
+    const b = fs.readFileSync(p).toString('base64');
+    return `<span class="logo"><img alt="" src="data:image/${ext.slice(1)};base64,${b}"/></span>`;
+  } catch { return ''; }
+}
+const LOGO = logoHtml();
+// CSS variables: the app's palette, or the neutral default when no brand.json.
+const C = brand?.colors || {};
+const DEF = { bg: '#FCFCFB', surface: '#F6F5F2', ink: '#2E2B27', muted: '#6E675F', primary: '#1E6B4F', accent: '#1E6B4F', ok: '#1E6B4F', bad: '#A4452C', line: '#E7E2DA' };
+const V = { ...DEF, ...C };
+const rootVars = `--ground:${V.bg}; --raise:${V.surface}; --ink:${V.ink}; --soft:${V.muted}; --faint:${V.muted}99;
+    --accent:${V.primary}; --wash:${V.surface}; --line:${V.line}; --ok:${V.ok}; --bad:${V.bad};`;
+const isDarkBrand = brand?.mode === 'dark';
+// Optional "What changed" block for the Functional proof: the agent writes an
+// outcome-based, app-voice summary (HTML or plain text) to a file, passed as --summary.
+const CHANGES = (() => {
+  if (!args.summary || !fs.existsSync(args.summary)) return '';
+  let s = ''; try { s = fs.readFileSync(args.summary, 'utf8').trim(); } catch { return ''; }
+  if (!s) return '';
+  const body = /<\w+/.test(s) ? s : s.split(/\n{2,}/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
+  return `<section class="changes"><h2>What changed</h2>${body}</section>`;
+})();
+
+// Resolve run directories, newest first. Tolerates flaky runs: a flow that
+// failed in the latest run still shows its last good screenshots from an
+// earlier retained run.
+function runDirsUnder(dir) {
+  if (!dir || !fs.existsSync(dir)) return [];
+  // Newer Maestro writes per-flow output under <debug>/.maestro/tests/<ts>/;
+  // treat each of those timestamp dirs as a run alongside the classic layout.
+  const nested = path.join(dir, '.maestro', 'tests');
+  if (fs.existsSync(nested)) {
+    return fs.readdirSync(nested)
+      .map((d) => path.join(nested, d))
+      .filter((d) => { try { return fs.statSync(d).isDirectory(); } catch { return false; } })
+      .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+  }
+  const kids = fs.readdirSync(dir).map((d) => path.join(dir, d)).filter((d) => {
+    try { return fs.statSync(d).isDirectory(); } catch { return false; }
+  });
+  const looksLikeRun = kids.some((k) => fs.existsSync(path.join(k, 'takeScreenshot')) || fs.existsSync(path.join(k, 'screenshots')));
+  const runs = looksLikeRun ? [dir] : kids;
+  return runs.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+}
+// A qa-review run dir holds debug/ (Maestro debug output with per-flow subdirs).
+function qaReviewRunDirs(base) {
+  if (!base || !fs.existsSync(base)) return [];
+  return fs.readdirSync(base)
+    .map((d) => path.join(base, d))
+    .filter((d) => { try { return fs.statSync(d).isDirectory(); } catch { return false; } })
+    .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)
+    .flatMap((run) => runDirsUnder(fs.existsSync(path.join(run, 'debug')) ? path.join(run, 'debug') : run));
+}
+const runDirs = args.debug ? runDirsUnder(args.debug) : (home ? qaReviewRunDirs(path.join(home, 'runs')) : []);
+if (!runDirs.length) console.error('build-report: warning, no run directories found');
+
+const statePath = args.state || (home ? path.join(home, '.report-state.json') : null);
+const outPath = args.out || (runDirs[0] ? path.join(path.dirname(runDirs[0]), 'report.html') : 'report.html');
+const maxShots = Number(args.shots || 12);
+const buildLabel = args.build || 'local run';
+const reviewedAt = args.now ? new Date(args.now) : new Date();
+
+// A retry result file (result-retry-<flow>.xml) is authoritative over the base
+// result.xml for that flow, whatever order the files arrive in. summarize-run.mjs
+// applies the same rule, so the summary the agent reads and the report the human
+// reads always agree.
+function junitStatus() {
+  const map = {};
+  const files = (args.junit || '').split(',').map((f) => f.trim()).filter(Boolean);
+  const ordered = [...files.filter((f) => !/retry/.test(path.basename(f))), ...files.filter((f) => /retry/.test(path.basename(f)))];
+  for (const file of ordered) {
+    if (!fs.existsSync(file)) continue;
+    const xml = fs.readFileSync(file, 'utf8');
+    const isRetry = /retry/.test(path.basename(file));
+    for (const m of xml.matchAll(/<testcase\b[^>]*\bname="([^"]+)"[^>]*(\/>|>([\s\S]*?)<\/testcase>)/g)) {
+      const flow = m[1].replace(/\.yaml$/, '');
+      const failed = /<failure|<error/.test(m[3] || '');
+      map[flow] = failed ? 'failed' : 'passed';
+      if (failed && /no result of its own/.test(m[3] || '')) scenarioStopped.add(flow);
+      else scenarioStopped.delete(flow);
+      if (isRetry) retried.add(flow);
+    }
+  }
+  return map;
+}
+const retried = new Set();
+// Flows that never ran because their scenario stopped at an earlier step.
+const scenarioStopped = new Set();
+const status = junitStatus();
+
+// Every flow that ran gets a card. The report used to walk the journeys
+// manifest only, so a flow that ran but was never listed there (73 of 143 in
+// one Sep 26 regression) vanished from the proof, screenshots and all.
+const UNLISTED_CATEGORY = 'Other flows (not in the journey list yet)';
+{
+  const listed = new Set(manifest.journeys.map((j) => j.flow));
+  const humanize = (f) => f.replace(/[-_]+/g, ' ').replace(/^./, (c) => c.toUpperCase());
+  const unlisted = Object.keys(status).filter((f) => !listed.has(f)).sort();
+  // Cards read q (heading) and a (one line under it); an unlisted flow has
+  // neither, so the card printed "undefined". Name it from the file and take
+  // the line from the flow's own header comment.
+  const flowsDir = path.join(path.dirname(args.manifest), 'flows');
+  const headerLine = (flow) => {
+    try {
+      const text = fs.readFileSync(path.join(flowsDir, `${flow}.yaml`), 'utf8');
+      const lines = [];
+      for (const raw of text.split('\n')) {
+        const line = raw.trim();
+        if (!line.startsWith('#')) break;
+        const words = line.replace(/^#+\s?/, '');
+        if (!words) {
+          if (lines.length) break;
+          continue;
+        }
+        lines.push(words);
+      }
+      const joined = lines.join(' ').replace(/\s+/g, ' ').trim();
+      const sentence = joined.split(/(?<=[.!?])\s/)[0] || '';
+      return sentence.length > 180 ? `${sentence.slice(0, 177)}...` : sentence;
+    } catch {
+      return '';
+    }
+  };
+  for (const flow of unlisted) {
+    const title = humanize(flow);
+    manifest.journeys.push({ id: flow, flow, title, q: title, a: headerLine(flow), category: UNLISTED_CATEGORY, unlisted: true });
+  }
+  if (unlisted.length && Array.isArray(manifest.categories) && !manifest.categories.includes(UNLISTED_CATEGORY)) {
+    manifest.categories.push(UNLISTED_CATEGORY);
+  }
+}
+
+// What was under test this run, written by qa-review-run.sh. Null when the runner
+// could not fingerprint the build; carried evidence then always expires, so an
+// unknown build never counts as green.
+const currentBuild = (() => {
+  if (!args.buildinfo || !fs.existsSync(args.buildinfo)) return null;
+  try { return JSON.parse(fs.readFileSync(args.buildinfo, 'utf8')); } catch { return null; }
+})();
+
+// --previous: carry reels forward from an older report for flows this run did
+// not capture, along with WHEN they were captured and WHICH build they show.
+// Provenance travels in the markup (data-captured, data-build), so a reel that
+// survives several partial runs still reports its original date instead of
+// decaying into "the previous run".
+const CARRY_DAYS = Number(args.carrydays || 7);
+const previousReels = (() => {
+  const out = {};
+  if (!args.previous || !fs.existsSync(args.previous)) return out;
+  const html = fs.readFileSync(args.previous, 'utf8');
+  for (const m of html.matchAll(/<article[^>]*data-flow="([^"]+)"[\s\S]*?<\/article>/g)) {
+    const reel = m[0].match(/<div class="reel">([\s\S]*?)<\/div>\s*(?:<div class="(?:meta|foot)|<\/article>)/);
+    if (!reel || /reel-empty/.test(m[0])) continue;
+    out[m[1]] = {
+      reel: reel[1],
+      captured: (m[0].match(/data-captured="([^"]*)"/) || [])[1] || null,
+      build: (m[0].match(/data-build="([^"]*)"/) || [])[1] || null,
+    };
+  }
+  return out;
+})();
+
+// Evidence from an earlier run counts as green only while it still describes
+// this build AND is younger than the carry window. Anything else still shows,
+// marked as needing a rerun, with the reason spelled out.
+function carriedFor(flow) {
+  const p = previousReels[flow];
+  if (!p || !p.reel) return null;
+  const ageMs = p.captured ? (reviewedAt - new Date(p.captured)) : Infinity;
+  const sameBuild = !!(currentBuild?.hash && p.build && p.build === currentBuild.hash);
+  const inWindow = ageMs < CARRY_DAYS * 864e5;
+  const reason = !currentBuild?.hash || !p.build
+    ? 'the build it ran against is unknown'
+    : (!sameBuild ? 'it ran before the current build' : `it is more than ${CARRY_DAYS} days old`);
+  return { ...p, fresh: sameBuild && inWindow, reason };
+}
+
+function shotsFor(flow, cap = maxShots) {
+  // Prefer explicit takeScreenshot/ captures (the journey's real moments, in
+  // order), searching runs newest-first. Fall back to Maestro auto-captures,
+  // evenly sampled to the cap.
+  for (const run of runDirs) {
+    const named = path.join(run, flow, 'takeScreenshot');
+    if (!fs.existsSync(named)) continue;
+    const pngs = fs.readdirSync(named).filter((f) => f.toLowerCase().endsWith('.png')).sort();
+    if (!pngs.length) continue;
+    const picked = pngs.slice(0, cap).map((f) => path.join(named, f));
+    // A red flow stops between named moments, so add the last automatic
+    // capture from the same attempt: the screen it actually failed on.
+    if (status[flow] === 'failed') {
+      const auto = path.join(run, flow, 'screenshots');
+      const last = fs.existsSync(auto)
+        ? fs.readdirSync(auto).filter((f) => f.toLowerCase().endsWith('.png')).sort().pop()
+        : null;
+      if (last) picked.push(path.join(auto, last));
+    }
+    return picked;
+  }
+  for (const run of runDirs) {
+    for (const dir of [path.join(run, flow, 'screenshots'), path.join(run, flow)]) {
+      if (!fs.existsSync(dir)) continue;
+      const pngs = fs.readdirSync(dir).filter((f) => f.toLowerCase().endsWith('.png')).sort();
+      if (!pngs.length) continue;
+      const pick = pngs.length <= cap ? pngs : Array.from({ length: cap }, (_, i) => pngs[Math.round((i * (pngs.length - 1)) / (cap - 1))]);
+      return [...new Set(pick)].map((f) => path.join(dir, f));
+    }
+  }
+  // Scenario flows write under <run>/scenario-*/**/runtime/<ts>/<flow>/, outside
+  // debug/. Look there next, newest first.
+  for (const root of runRoots) {
+    const found = findFlowShotDir(root, flow, 5);
+    if (found) {
+      const pngs = fs.readdirSync(found).filter((f) => f.toLowerCase().endsWith('.png')).sort();
+      if (pngs.length) return pngs.slice(0, cap).map((f) => path.join(found, f));
+    }
+  }
+  // Last resort: Maestro's own failure capture for this flow
+  // ("screenshot-...-(<flow>.yaml).png"), so a flow that failed before its
+  // first takeScreenshot still shows where it stopped.
+  for (const run of runDirs) {
+    let files = [];
+    try { files = fs.readdirSync(run); } catch { continue; }
+    const fail = files.filter((f) => f.endsWith(`(${flow}.yaml).png`)).sort().pop();
+    if (fail) return [path.join(run, fail)];
+  }
+  return [];
+}
+
+// qa-review run roots (the dirs holding debug/ and scenario-*/), newest first.
+const runRoots = [...new Set(runDirs.map((d) => {
+  const i = d.indexOf(`${path.sep}debug${path.sep}`);
+  return i >= 0 ? d.slice(0, i) : path.dirname(d);
+}))];
+
+function findFlowShotDir(dir, flow, depth) {
+  if (depth < 0) return null;
+  let entries = [];
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return null; }
+  const dirs = entries.filter((e) => e.isDirectory() && e.name !== 'debug' && e.name !== 'ui-review');
+  const hit = dirs.find((e) => e.name === flow);
+  if (hit) {
+    for (const sub of ['takeScreenshot', 'screenshots']) {
+      const p = path.join(dir, flow, sub);
+      if (fs.existsSync(p)) return p;
+    }
+  }
+  const sorted = dirs
+    .map((e) => path.join(dir, e.name))
+    .sort((a, b) => { try { return fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs; } catch { return 0; } });
+  for (const d of sorted) {
+    const found = findFlowShotDir(d, flow, depth - 1);
+    if (found) return found;
+  }
+  return null;
+}
+const ranThisRun = (flow) => Boolean(status[flow]) || shotsFor(flow).length > 0;
+
+// The JUnit verdict is authoritative: a flow whose assertion failed is FAILED
+// even if it captured screenshots before the failing step. Screenshots only
+// decide status for flows with no JUnit entry.
+let state = {};
+if (statePath) { try { state = JSON.parse(fs.readFileSync(statePath, 'utf8')); } catch { state = {}; } }
+const iso = reviewedAt.toISOString();
+for (const j of manifest.journeys) {
+  if (ranThisRun(j.flow)) state[j.flow] = { lastReviewed: iso, status: status[j.flow] || 'passed' };
+}
+
+// Screenshots are downscaled + recompressed to JPEG (macOS sips) before base64
+// inlining so the page stays small. Frames render narrow, so ~1000px is
+// retina-crisp at a fraction of raw PNG size. Falls back to the raw file when
+// sips is missing (non-macOS).
+let rawEmbeds = 0;
+// 640px at quality 62 keeps a full 150-flow regression near 15MB so it opens
+// and shares; pass --imgpx/--imgq for a sharper single-flow proof.
+const IMG_MAX_PX = Number(args.imgpx || 640);
+const IMG_QUALITY = Number(args.imgq || 62);
+const b64 = (p) => {
+  let buf;
+  try {
+    const tmp = `${p}.report.jpg`;
+    execFileSync('sips', ['-Z', String(IMG_MAX_PX), '-s', 'format', 'jpeg', '-s', 'formatOptions', String(IMG_QUALITY), p, '--out', tmp], { stdio: 'ignore' });
+    buf = fs.readFileSync(tmp);
+    fs.unlinkSync(tmp);
+  } catch {
+    buf = fs.readFileSync(p);
+    rawEmbeds += 1;
+  }
+  const mime = buf[0] === 0xff && buf[1] === 0xd8 ? 'image/jpeg' : 'image/png';
+  return `data:${mime};base64,${buf.toString('base64')}`;
+};
+// Printed text is normalised so the proof passes a deslop gate: long dashes
+// become a plain hyphen and curly quotes become straight ones.
+const plain = (s) =>
+  String(s)
+    .replace(/\s*[\u2014\u2013]\s*/g, ' - ')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"');
+const esc = (s) => plain(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const fmtDate = (isoStr) => {
+  if (!isoStr) return null;
+  const d = new Date(isoStr);
+  if (isNaN(d)) return null;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+};
+
+const categories = manifest.categories || [...new Set(manifest.journeys.map((j) => j.category || 'Journeys'))];
+const frameClass = isWeb ? 'browser' : 'phone';
+const figure = (src, alt) => isWeb
+  ? `<figure class="browser"><span class="chrome"><i></i><i></i><i></i></span><span class="screen"><img loading="lazy" src="${src}" alt="${alt}" /></span></figure>`
+  : `<figure class="phone"><span class="screen"><img loading="lazy" src="${src}" alt="${alt}" /></span></figure>`;
+
+// Five states: ran this time (fresh or failed), did not run but has evidence
+// still describing this build (carried), did not run and its evidence is stale
+// (expired), or never ran at all.
+function cardState(j) {
+  if (j.planned) return { kind: 'planned' };
+  // Real screenshot files on disk always beat a reel scraped out of old HTML.
+  if (ranThisRun(j.flow) || shotsFor(j.flow).length) return { kind: 'fresh' };
+  const carried = carriedFor(j.flow);
+  if (carried) return { kind: carried.fresh ? 'carried' : 'expired', carried };
+  return { kind: 'never' };
+}
+
+function journeyCard(j) {
+  const planned = !!j.planned;
+  const { kind, carried } = cardState(j);
+  const st = planned ? 'planned' : (state[j.flow]?.status || (status[j.flow] || (shotsFor(j.flow).length ? 'passed' : 'pending')));
+  const reviewed = fmtDate(state[j.flow]?.lastReviewed);
+  const shots = planned ? [] : shotsFor(j.flow, j.shots || maxShots);
+  const film = shots.length
+    ? `<div class="reel">${shots.map((s) => figure(b64(s), esc(j.q))).join('')}</div>`
+    : kind === 'carried'
+      ? `<div class="reel-note">Not run this time. Showing the run of ${esc(fmtDate(carried.captured) || 'an earlier day')}, on this same build.</div><div class="reel">${carried.reel}</div>`
+      : kind === 'expired'
+        ? `<div class="reel-note">Not run this time, and ${esc(carried.reason)}. Showing the run of ${esc(fmtDate(carried.captured) || 'an earlier day')}. Needs a rerun.</div><div class="reel stale">${carried.reel}</div>`
+        : `<div class="reel-empty">${
+            planned
+              ? 'Planned. The flow for this is not built yet.'
+              : scenarioStopped.has(j.flow)
+                ? 'Its scenario stopped at an earlier step, so this part did not run.'
+                : st === 'failed'
+                ? 'Failed before its first screenshot.'
+                : status[j.flow]
+                  ? 'Ran with no screenshots. Add a takeScreenshot step to this flow.'
+                  : 'Did not run this time (its scenario or tag was not part of this run).'
+          }</div>`;
+  const label = st === 'failed' ? 'Needs a look' : (retried.has(j.flow) ? 'Passed on retry' : 'Verified');
+  const chip = planned
+    ? `<span class="stamp planned">Planned</span>`
+    : kind === 'carried'
+      ? `<span class="stamp ok">Verified ${esc(fmtDate(carried.captured) || '')}, carried</span>`
+      : kind === 'expired'
+        ? `<span class="stamp pending">Needs a rerun</span>`
+        : (reviewed
+            ? `<span class="stamp ${st === 'failed' ? 'warn' : (retried.has(j.flow) ? 'retry' : 'ok')}">${label} ${esc(reviewed)}</span>`
+            : `<span class="stamp pending">Not run yet</span>`);
+  // Provenance for the next report to carry forward: a fresh reel stamps this
+  // run's date and build, a carried one passes the original's through unchanged.
+  const captured = shots.length ? iso : (carried?.captured || '');
+  const builtOn = shots.length ? (currentBuild?.hash || '') : (carried?.build || '');
+  return `<article class="qa${st === 'failed' ? ' off' : ''}${planned ? ' planned' : ''}" data-flow="${esc(j.flow)}" data-captured="${esc(captured)}" data-build="${esc(builtOn)}">
+      <h3>${esc(j.q)}</h3>
+      <p>${esc(j.a)}</p>
+      ${film}
+      <div class="foot">${chip}</div>
+    </article>`;
+}
+
+// Optional sidecar sections written by the modes as plain JSON.
+const readJson = (p) => (p && fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : null);
+const crosscheck = readJson(args.crosscheck);
+const gaps = readJson(args.gaps);
+const product = readJson(args.product);
+
+const VERDICT = {
+  PASS: 'v-pass', FAIL: 'v-fail', 'SCRIPT WRONG': 'v-script', 'NOT WIRED': 'v-wire', BLOCKED: 'v-block',
+};
+function crosscheckSection() {
+  if (!crosscheck || !crosscheck.cases?.length) return '';
+  const rows = crosscheck.cases.map((c) => `<tr class="${VERDICT[c.verdict] || ''}">
+      <td>${esc(c.id)}</td><td>${esc(c.title || '')}</td>
+      <td><span class="verdict ${VERDICT[c.verdict] || ''}">${esc(c.verdict)}</span></td>
+      <td>${esc(c.note || '')}</td></tr>`).join('');
+  const counts = {};
+  for (const c of crosscheck.cases) counts[c.verdict] = (counts[c.verdict] || 0) + 1;
+  const tally = Object.entries(counts).map(([v, n]) => `${n} ${v.toLowerCase()}`).join(', ');
+  return `<section class="extra"><h2>Test-script crosscheck</h2>
+    <p class="sub">${esc(crosscheck.source || '')}, ${tally}</p>
+    <div class="tablewrap"><table><thead><tr><th>Case</th><th>Title</th><th>Verdict</th><th>Note</th></tr></thead>
+    <tbody>${rows}</tbody></table></div>
+    ${crosscheck.scriptReview ? `<h3>Script review</h3><ul>${crosscheck.scriptReview.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>` : ''}
+  </section>`;
+}
+function gapsSection() {
+  if (!gaps || !gaps.items?.length) return '';
+  return `<section class="extra"><h2>${esc(gaps.title || 'Coverage gaps')}</h2>
+    <p class="sub">${esc(gaps.sub || 'Screens or branches in the code with no flow yet. Approve any of these to grow the manifest.')}</p>
+    <ul>${gaps.items.map((g) => `<li><b>${esc(g.area)}</b> (${esc(g.kind || 'happy')}): ${esc(g.note)}</li>`).join('')}</ul>
+  </section>`;
+}
+function productSection() {
+  if (!product || !product.findings?.length) return '';
+  // product.title / product.sub let the regression UI pass reuse this section
+  // ("UI and consistency"); severity marks a blocker vs a polish item.
+  return `<section class="extra"><h2>${esc(product.title || 'Product notes')}</h2>
+    <p class="sub">${esc(product.sub || 'UX findings from the product pass, one screenshot per screen.')}</p>
+    ${product.findings.map((f) => `<article class="qa"><h3>${esc(f.screen)}${f.severity ? ` <span class="sev">${esc(f.severity)}</span>` : ''}</h3><p>${esc(f.finding)}${f.fix ? ` Suggested fix: ${esc(f.fix)}` : ''}</p>${f.shot && fs.existsSync(f.shot) ? `<div class="reel">${figure(b64(f.shot), esc(f.screen))}</div>` : ''}</article>`).join('')}
+  </section>`;
+}
+
+const tabs = [{ id: 'all', label: 'All' }, ...categories.map((c) => ({ id: slug(c), label: c }))];
+const tabInputs = tabs.map((t, i) => `<input type="radio" name="tab" id="tab-${t.id}" class="tabctl"${i === 0 ? ' checked' : ''}>`).join('');
+const tabNav = `<nav class="tabs" role="tablist">${tabs.map((t) => `<label for="tab-${t.id}" class="tab" data-tab="${t.id}">${esc(t.label)}</label>`).join('')}</nav>`;
+const tabCss = tabs
+  .filter((t) => t.id !== 'all')
+  .map((t) => `#tab-${t.id}:checked~main .cat{display:none}#tab-${t.id}:checked~main .cat[data-cat="${t.id}"]{display:block}`)
+  .join('') + tabs.map((t) => `#tab-${t.id}:checked~.tabs label[for="tab-${t.id}"]{color:var(--ink);border-color:var(--accent)}`).join('');
+
+const sections = categories.map((c) => {
+  const items = manifest.journeys.filter((j) => (j.category || 'Journeys') === c);
+  if (!items.length) return '';
+  return `<section class="cat" data-cat="${slug(c)}">
+      <h2 class="cat-title">${esc(c)}</h2>
+      ${items.map(journeyCard).join('\n')}
+    </section>`;
+}).join('\n');
+
+const builtJourneys = manifest.journeys.filter((j) => !j.planned);
+const plannedCount = manifest.journeys.length - builtJourneys.length;
+const reviewedFlows = builtJourneys.filter((j) => ranThisRun(j.flow));
+const failedCount = reviewedFlows.filter((j) => (state[j.flow]?.status) === 'failed').length;
+const verifiedCount = reviewedFlows.length - failedCount;
+const notRun = builtJourneys.filter((j) => !ranThisRun(j.flow));
+const carriedCount = notRun.filter((j) => cardState(j).kind === 'carried').length;
+const expiredCount = notRun.filter((j) => cardState(j).kind === 'expired').length;
+const neverCount = notRun.length - carriedCount - expiredCount;
+// Carried evidence counts toward green, but is always named separately, so a
+// partial run can never read as a full pass.
+const greenlight = failedCount === 0 && (verifiedCount + carriedCount) === builtJourneys.length;
+const headline = failedCount
+  ? `${failedCount} need${failedCount === 1 ? 's' : ''} a look`
+  : (greenlight ? 'All journeys green' : `${expiredCount + neverCount} still to run`);
+const breakdown = [
+  `${verifiedCount} verified this run`,
+  carriedCount ? `${carriedCount} carried` : '',
+  expiredCount ? `${expiredCount} need${expiredCount === 1 ? 's' : ''} a rerun` : '',
+  neverCount ? `${neverCount} never run` : '',
+  plannedCount ? `${plannedCount} planned` : '',
+].filter(Boolean).join(', ');
+
+const title = manifest.title || `${config.project || project || 'App'} flows`;
+const html = `<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${esc(title)}</title>
+<style>
+  ${FF.css}
+  :root{
+    ${rootVars}
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--ground);color:var(--ink);
+    font-family:${SANS}-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    line-height:1.55;font-size:17px;-webkit-font-smoothing:antialiased}
+  .page{max-width:720px;margin:0 auto;padding:56px 24px 96px}
+  .logo{display:block;margin:0 0 16px}
+  .logo svg{height:34px;width:auto;display:block}
+  .logo img{height:34px;width:auto;display:block}
+  header h1{font-family:${HEAD}-apple-system,BlinkMacSystemFont,sans-serif;font-size:32px;font-weight:700;letter-spacing:-0.02em;margin:0 0 10px}
+  .qa h3,.extra h2{font-family:${HEAD}-apple-system,BlinkMacSystemFont,sans-serif}
+  .intro{color:var(--soft);font-size:17px;margin:0;max-width:48ch}
+  .meta{margin-top:18px;font-size:14px;color:var(--soft)}
+  .meta b{color:${greenlight ? 'var(--ok)' : 'var(--bad)'}}
+  .changes{margin-top:22px;padding:18px 20px;background:var(--wash);border:1px solid var(--line);border-radius:14px}
+  .changes h2{font-family:${HEAD}-apple-system,sans-serif;font-size:18px;margin:0 0 8px;color:var(--ink)}
+  .changes p{margin:0 0 8px;color:var(--soft);font-size:15px}
+  .changes p:last-child{margin-bottom:0}
+  .search{position:relative;margin-top:26px}
+  #q{width:100%;font-family:inherit;font-size:16px;color:var(--ink);background:var(--raise);
+    border:1px solid var(--line);border-radius:12px;padding:12px 16px;outline:none}
+  #q:focus{border-color:var(--accent)}
+  .tabctl{position:absolute;opacity:0;pointer-events:none}
+  .tabs{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 4px}
+  body.searching .tabs{display:none}
+  body.searching .cat{display:block!important}
+  body.searching .cat-title{display:none}
+  .qa[hidden]{display:none!important}
+  .cat[data-empty]{display:none!important}
+  .nomatch{color:var(--soft);font-size:16px;font-style:italic;margin:40px 0;text-align:center}
+  .tab{font-size:14px;font-weight:600;color:var(--soft);cursor:pointer;user-select:none;
+    padding:6px 2px;border-bottom:2px solid transparent}
+  .tab:hover{color:var(--ink)}
+  ${tabCss}
+  .cat{display:block}
+  .cat-title{font-size:15px;font-weight:700;color:var(--faint);margin:38px 0 0}
+  .qa{padding:30px 0;border-top:1px solid var(--line)}
+  .cat-title + .qa{border-top:0}
+  .qa h3{font-size:21px;font-weight:700;letter-spacing:-0.01em;margin:0}
+  .qa p{margin:8px 0 18px;color:var(--soft);font-size:16px;max-width:60ch}
+  .qa.off h3{color:var(--bad)}
+  .reel{display:flex;gap:16px;overflow-x:auto;padding:2px 2px 8px;scroll-snap-type:x proximity;
+    -webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+  .phone{flex:none;margin:0;width:190px;padding:7px;scroll-snap-align:start;
+    border-radius:32px;background:#211d19;border:1px solid #3a342e}
+  .phone .screen{display:block;overflow:hidden;border-radius:25px;background:#fff;aspect-ratio:393/760}
+  .phone img{width:100%;height:100%;display:block;object-fit:cover;object-position:center 54%}
+  .browser{flex:none;margin:0;width:420px;scroll-snap-align:start;border:1px solid var(--line);
+    border-radius:10px;overflow:hidden;background:var(--raise)}
+  .browser .chrome{display:flex;gap:5px;padding:8px 10px;border-bottom:1px solid var(--line)}
+  .browser .chrome i{width:9px;height:9px;border-radius:50%;background:var(--line)}
+  .browser .screen{display:block;background:#fff;aspect-ratio:16/10}
+  .browser img{width:100%;height:100%;display:block;object-fit:cover;object-position:top}
+  .reel-note{color:var(--faint);font-size:13px;font-style:italic;padding:10px 0 0}
+  .reel.stale{opacity:.55}
+  .reel-empty{color:var(--faint);font-size:15px;font-style:italic;padding:20px;
+    border:1px dashed var(--line);border-radius:14px;background:var(--raise)}
+  .foot{margin-top:14px}
+  .stamp{font-size:13px;color:var(--faint)}
+  .stamp.ok{color:var(--ok)}
+  .stamp.warn{color:var(--bad);font-weight:600}
+  .stamp.retry{color:#7A5A12}
+  .stamp.planned,.stamp.pending{color:var(--faint)}
+  .qa.planned{opacity:0.72}
+  .qa.planned h3{color:var(--faint)}
+  .extra{margin-top:48px;padding-top:8px;border-top:1px solid var(--line)}
+  .extra h2{font-size:24px;letter-spacing:-0.01em;margin:24px 0 4px}
+  .extra .sub{color:var(--soft);margin:0 0 16px}
+  .tablewrap{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;font-size:15px}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--faint);font-weight:600}
+  .verdict{font-weight:700;font-size:13px;white-space:nowrap}
+  .v-pass .verdict,.verdict.v-pass{color:var(--ok)}
+  .verdict.v-fail{color:var(--bad)}
+  .verdict.v-script{color:#7A5A12}
+  .verdict.v-wire{color:#4A4A6A}
+  .verdict.v-block{color:var(--soft)}
+  @media (max-width:520px){.page{padding:44px 18px 72px}header h1{font-size:26px}.phone{width:150px}.browser{width:300px}}
+</style></head><body>
+<div class="page">
+  <header>
+    ${LOGO}
+    <h1>${esc(title)}</h1>
+    ${manifest.intro ? `<p class="intro">${esc(manifest.intro)}</p>` : ''}
+    <div class="meta">${esc(buildLabel)}. <b>${headline}</b>. ${breakdown}</div>
+  </header>
+  ${CHANGES}
+  <div class="search">
+    <input id="q" type="search" placeholder="Search flows" aria-label="Search flows" autocomplete="off" />
+  </div>
+  ${tabInputs}
+  ${tabNav}
+  <main>
+    ${sections}
+    <p class="nomatch" hidden>No flows match that.</p>
+    ${crosscheckSection()}
+    ${gapsSection()}
+    ${productSection()}
+  </main>
+</div>
+<script>
+(function () {
+  var q = document.getElementById('q');
+  var body = document.body;
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.qa'));
+  var cats = Array.prototype.slice.call(document.querySelectorAll('.cat'));
+  var nomatch = document.querySelector('.nomatch');
+  cards.forEach(function (c) { c._t = (c.textContent || '').toLowerCase(); });
+  function apply() {
+    var term = (q.value || '').trim().toLowerCase();
+    if (!term) {
+      body.classList.remove('searching');
+      cards.forEach(function (c) { c.hidden = false; });
+      cats.forEach(function (c) { c.removeAttribute('data-empty'); });
+      if (nomatch) nomatch.hidden = true;
+      return;
+    }
+    body.classList.add('searching');
+    var shown = 0;
+    cards.forEach(function (c) {
+      var hit = c._t.indexOf(term) !== -1;
+      c.hidden = !hit;
+      if (hit) shown++;
+    });
+    cats.forEach(function (c) {
+      var any = c.querySelector('.qa:not([hidden])');
+      if (any) c.removeAttribute('data-empty'); else c.setAttribute('data-empty', '');
+    });
+    if (nomatch) nomatch.hidden = shown !== 0;
+  }
+  q.addEventListener('input', apply);
+})();
+</script>
+</body></html>`;
+
+fs.mkdirSync(path.dirname(outPath), { recursive: true });
+fs.writeFileSync(outPath, html);
+if (statePath) fs.writeFileSync(statePath, JSON.stringify(state, null, 2) + '\n');
+if (rawEmbeds) console.error(`build-report: ${rawEmbeds} screenshot(s) embedded at full size (sips not available; macOS only). The report is larger than it needs to be.`);
+console.log(`Wrote ${outPath} (${(html.length / 1024 / 1024).toFixed(1)} MB), reviewed ${reviewedFlows.length}/${manifest.journeys.length} this run, ${failedCount} failing`);

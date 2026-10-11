@@ -1,0 +1,31 @@
+{
+  "_comment": "One entry per journey. flow = flows/<name> without .yaml (also the JUnit testcase name and the debug-output subdir). category must be one of categories (drives report tabs). mode = critical | happy | all (report badge; keep in sync with the tags: block in the flow YAML, which drives run selection). q/a = the human-readable question + answer shown on the report card. planned: true renders a gray card with no screenshots, so the report doubles as the full e2e plan. Optional shots: <n> raises the screenshot cap for wide journeys like screen-walk.",
+  "title": "Acme flows",
+  "intro": "Every journey the app walks on its own before a release, with the pictures to prove it.",
+  "categories": ["Getting in", "Core", "Settings"],
+  "journeys": [
+    {
+      "flow": "screen-walk",
+      "category": "Core",
+      "mode": "critical",
+      "q": "Does every screen load without an error?",
+      "a": "Opens every top-level screen and fails if any renders the app's error copy.",
+      "shots": 12
+    },
+    {
+      "flow": "login",
+      "category": "Getting in",
+      "mode": "critical",
+      "q": "Can a user log in?",
+      "a": "From the welcome screen to a loaded home screen with a real test account."
+    },
+    {
+      "flow": "some-future-journey",
+      "category": "Core",
+      "mode": "happy",
+      "q": "Planned journey example",
+      "a": "Marked planned until its flow is built.",
+      "planned": true
+    }
+  ]
+}

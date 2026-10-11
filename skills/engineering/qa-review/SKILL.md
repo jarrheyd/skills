@@ -1,0 +1,83 @@
+---
+name: qa-review
+description: Maestro e2e audit skill for any web or mobile app. Walks the app screen per screen, captures evidence, and builds a skimmable local HTML report for QA and product review. Use when the user says "qa-review", wants to set up e2e flows, run a pre-deployment audit, cross-check a QA test script against the live app, review or author a test script, or wants screenshot proof that flows work before greenlighting a release.
+version: 1.0.0
+user-invocable: true
+argument-hint: "[setup|run|crosscheck|audit|review] [target]"
+license: MIT
+---
+
+# qa-review
+
+Drive the app the way a user would, keep the proof, and let a human greenlight from one report. Maestro runs the flows on an iOS simulator, an Android emulator, or Chrome (web); scripts assemble the evidence; the AI reads only a small summary. Works with any AI agent that can run shell commands.
+
+## Modes
+
+Three public modes, each ending in a branded proof (`references/publish.md`):
+
+| Invocation | Mode file | What it does |
+| --- | --- | --- |
+| `qa-review smoke` | `modes/smoke.md` | The fast gate: run the core flows, branded pass/fail proof |
+| `qa-review functional` | `modes/functional.md` | Change-scoped: run the flows this build touched, publish a proof that summarizes the changes |
+| `qa-review regression` | `modes/regression.md` | The full suite that replaces hand-written QA scripts: resumable, freshness-repaired, ending in a production-readiness verdict |
+
+Building blocks the three modes call (invoke directly for the narrow task):
+
+| Invocation | Mode file | What it does |
+| --- | --- | --- |
+| `qa-review setup` | `modes/setup.md` | Bootstrap a project: generate flows, manifest, screen-walk from the code |
+| `qa-review run [tag]` | `modes/run.md` | Run flows (optionally one tag), build the report |
+| `qa-review crosscheck <sheet-or-file>` | `modes/crosscheck.md` | Verify a QA test script case by case against the live app |
+| `qa-review audit [--changed] [--product]` | `modes/audit.md` | Pre-deployment full audit + coverage gap analysis |
+| `qa-review review <script>` | `modes/review.md` | Review or author a QA test script without driving the app |
+| `qa-review doctor` | (script) | `node scripts/qa-review-doctor.mjs --repo <repo>`: is the project ready for a repeatable regression; OK/WARN/FAIL with the fix per item |
+
+Read ONLY the mode file for the invoked mode. If no mode is named, infer it: "quick check / does it still work" means smoke; "before I mark this done / what changed" means functional; "before we ship / full pass / replace the QA scripts" means regression; a spreadsheet or test script link means crosscheck; a repo with no `.maestro/` means setup.
+
+The proof always wears the target app's brand. Every public mode runs `scripts/detect-brand.mjs` first (colors, light or dark, fonts, logo, into `~/.qa-review/<project>/brand.json`), and `build-report.mjs` themes the report from it. Detection is best-effort with a neutral fallback, so a miss never blocks the proof.
+
+## Where things live
+
+- Target repo (committed, the only repo footprint): `.maestro/flows/*.yaml`, `.maestro/journeys.manifest.json`, `.maestro/qa-review.config.json`
+- Local device (never committed): `~/.qa-review/<project>/` holds `.env` (credentials, user-filled) and `runs/<timestamp>/` (Maestro debug output, screenshots, JUnit XML, `run-summary.json`, `report.html`)
+- Skill scripts: `scripts/` in this skill directory. Call them with absolute paths; they take the project via `--project <name>` or `QA_REVIEW_PROJECT`.
+
+`qa-review.config.json` (committed, no secrets): `{ "project": "<name>", "platform": "mobile|android|web", "appId" | "url", "buildCmd", "installCmd", "errorCopy": ["..."], "envKeys": ["QA_REVIEW_USER", ...] }`
+
+A web repo with a Playwright suite sets `"runner": "playwright"` and keeps the config and manifest at the repo root; no Maestro flows. See `references/playwright.md`.
+
+Optional keys: `seedCmd` (resets test data before each run; its `KEY=VALUE` output lines are merged into the local `.env`), `excludeFlows` (globs for throwaway flows kept out of the suite), `designDoc` and `uiRules` (what the UI and consistency pass checks screens against).
+
+## Hard rules (every mode)
+
+1. Token efficiency. Scripts do the driving and the report assembly. After a run, read `run-summary.json` only. Open a screenshot only when its step failed or a mode explicitly flags it. Never page through full filmstrips; the human does that in `report.html`.
+2. Credentials live only in `~/.qa-review/<project>/.env`. You write placeholder keys, the user fills values. Never read the values back into chat, never put them in flows (flows use `${QA_REVIEW_USER}`-style env refs), never screenshot a password on screen.
+3. Never production. `scripts/guard-env.sh` runs before every suite, on the config target and on every selected flow's own `url:`. A target passes only when a hostname label or bundle-id segment is a dev/staging/test marker; only the user exporting `QA_REVIEW_ALLOW_PROD=1` overrides it. Test or staging accounts only.
+4. Fail loud. Never swallow a failing step to keep a run green. A bounded or skipped check is named in the summary so "passed" never quietly means "did not run".
+4b. Carried evidence is labelled, never laundered. A flow that did not run this time still shows its last screenshots. Those count toward green only while they describe the build under test (fingerprinted per run) and are under 7 days old; anything else is shown dimmed and marked as needing a rerun. The header always counts carried separately from verified, so a partial run cannot read as a full pass. No fingerprint means everything carried expires.
+5. Finish with the report. `qa-review-run.sh` opens `report.html` itself at the end of every run (`QA_REVIEW_NO_OPEN=1` to stop it). Rebuild the report by hand in another mode and you open it by hand: `scripts/open-report.sh <run>/report.html`. The report is the deliverable; your text is a short verdict on top of it.
+6. Repo hygiene. Nothing generated lands in the target repo except flows, manifest, and config. If a project insists on in-repo output, append `templates/gitignore-snippet` to its `.gitignore` first.
+7. Classify every red, never explain it away. A failing flow is one of: CRASH (the app process died or a native/red-box error appeared), DEFECT (the app stayed on the right screen but behaved wrong), FLOW-ROT (the screen is correct but a selector or layout changed so the flow could not reach it), or ENV (the driver or backend failed). Determine it from the app's process state and a screenshot at the failed step, not from a guess. A CRASH or DEFECT is a release blocker; a FLOW-ROT is repaired and rerun before the verdict; an ENV is named and retried. The report carries the class on every red. Full definitions and the mechanical test: `references/regression-report.md`.
+8. Keep flows fresh. Flows rot silently when a feature changes a testID, label, or layout, and a stale flow tests nothing while looking green or red for the wrong reason. Update a screen's flows in the same change as the screen. Each audit, cross-check every selector a flow uses against the testIDs in the current code and repair any with no match before the run counts. Reset shared state between flows that create data so one case never inherits another's leftovers. The report presents flows as a numbered regression-test-case matrix with a production-readiness line: `references/regression-report.md`.
+
+## Flow-writing rules
+
+Follow `references/conventions.md` for every flow you write or edit. Short version: testID selectors first, `_`-prefixed reusable partials via `runFlow:`, numbered `takeScreenshot: 01-name` steps at the moments that matter, `assertNotVisible` with the app's literal error copy after every screen, idempotent conditional steps for shared accounts, bounded repeats, explicit timeouts.
+
+## Prerequisites (check before first run)
+
+- `maestro` on PATH (`~/.maestro/bin`); install: `curl -fsSL "https://get.maestro.mobile.dev" | bash`
+- A Java runtime (Maestro needs it): `brew install --cask temurin` on macOS
+- iOS: Xcode + a simulator. Android: `adb` + a running emulator. Web: Chrome.
+
+## References
+
+| File | Purpose |
+| --- | --- |
+| `references/conventions.md` | Flow YAML rules distilled from production suites |
+| `references/verdicts.md` | Crosscheck verdict definitions + evidence bar |
+| `references/product-rubric.md` | The `--product` UX review rubric |
+| `references/web-driving.md` | Maestro on web: url config, selectors, quirks |
+| `references/playwright.md` | Playwright runner: a web suite written in Playwright, filed and reported by qa-review |
+| `references/ui-consistency.md` | The UI and consistency pass: every captured screen checked against the design doc and `uiRules`, findings with severity |
+| `references/regression-report.md` | Flows as a numbered regression-test-case matrix, failure classification (crash / defect / flow-rot / env), flow freshness, crash and freeze capture, the production-readiness line |

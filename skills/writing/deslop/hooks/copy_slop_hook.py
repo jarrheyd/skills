@@ -1,0 +1,1127 @@
+#!/usr/bin/env python3
+"""
+deslop copy hook.
+
+PreToolUse hook that blocks AI writing tells in prose (.md, .mdx, .txt, .html) and in
+the string literals of source files. Companion to design_slop_hook.py (visual tells).
+
+Exit codes:
+  0 = allow (clean, or not a prose file)
+  2 = block (at least one tell found; the reasons go to stderr)
+"""
+
+import html
+import json
+import os
+import re
+import sys
+# File patterns to check
+PROSE_EXTENSIONS = {".md", ".mdx", ".txt", ".html", ".htm"}
+
+# Also check string-heavy source files, but only string literals
+SOURCE_EXTENSIONS = {".tsx", ".jsx", ".ts", ".js", ".mjs", ".cjs", ".py",
+                     ".swift", ".kt", ".dart", ".go", ".rb", ".vue", ".svelte"}
+
+SKIP_PATTERNS = [
+    "node_modules",
+    ".env",
+    "CHANGELOG",
+    "LICENSE",
+    "package.json",
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    "yarn.lock",
+    # The skill's pattern catalogs and the hooks quote the tells on purpose.
+    # SKILL.md and README.md are NOT exempt: they must pass the gate they describe.
+    "deslop/references/",
+    "deslop/hooks/",
+    # Test fixtures quote the tells on purpose, same as the catalogs above.
+    "/tests/",
+    # Don't check design system references
+    "design-system/references/",
+    "brand-system/references/",
+    # Don't check generated files
+    ".next/",
+    "dist/",
+    "build/",
+]
+
+# Deployment-specific paths (a personal vault, a ledger dir, generated state) do not belong
+# in the shipped list. Set DESLOP_SKIP_PATHS to a comma-separated list to append your own.
+_extra_skips = os.environ.get("DESLOP_SKIP_PATHS", "")
+if _extra_skips:
+    SKIP_PATTERNS.extend(s.strip() for s in _extra_skips.split(",") if s.strip())
+
+# ============================================================
+# BANNED PHRASES (blocking — zero tolerance)
+# ============================================================
+
+BANNED_PHRASES = [
+    # Opening/transition fluff
+    (r"(?i)in\s+today'?s\s+fast[- ]paced", "banned phrase: 'in today's fast-paced...' - skip the throat-clearing, start with your point"),
+    (r"(?i)in\s+the\s+ever[- ]evolving\s+landscape", "banned phrase: 'in the ever-evolving landscape' - empty opener"),
+    (r"(?i)in\s+an?\s+era\s+where", "banned phrase: 'in an era where' - skip the preamble"),
+    (r"(?i)without\s+further\s+ado", "banned phrase: 'without further ado' - just say the thing"),
+
+    # The "Not X, but Y" family
+    (r"(?i)(?:it'?s|this\s+is)\s+not\s+just\s+\w+[^.]{0,40}\.\s*(?:it'?s|this\s+is)\s+", "banned pattern: 'It's not just X. It's Y.' - the #1 AI tell. Rewrite as a direct statement"),
+    (r"(?i)not\s+just\s+about\s+\w+[^-]*\s*-\s*it'?s\s+about", "banned pattern: 'not just about X - it's about Y' - AI reframe structure"),
+    # 'not only X but also Y' - flagged by The Economist's 2026 study as a device
+    # the models reach for. Needs both halves inside one sentence, so plain "not
+    # only" on its own passes.
+    (r"(?i)\bnot\s+only\s+[^.!?\n]{1,60}?\bbut\s+also\b", "banned pattern: 'not only X but also Y' - an AI cadence; make the two points as two plain statements, or drop the frame"),
+
+    # Aspirational fluff
+    (r"(?i)unlock\s+the\s+(?:power|potential)\s+of", "banned phrase: 'unlock the power/potential of' - say what it does"),
+    (r"(?i)elevate\s+your\s+(?:workflow|experience|game|strategy)", "banned phrase: 'elevate your...' - be specific"),
+    (r"(?i)revolutionize\s+the\s+way\s+you", "banned phrase: 'revolutionize the way you' - show, don't tell"),
+    (r"(?i)seamlessly\s+integrat", "banned phrase: 'seamlessly integrate' - describe the integration"),
+    (r"(?i)harness\s+the\s+power\s+of", "banned phrase: 'harness the power of' - be direct"),
+    (r"(?i)take\s+(?:your|it)\s+to\s+the\s+next\s+level", "banned phrase: 'take it to the next level' - what level?"),
+    (r"(?i)reimagine\s+what'?s\s+possible", "banned phrase: 'reimagine what's possible' - say what's actually possible"),
+
+    # Redundant verbs (AI padding)
+    (r"(?i)\bserves\s+as\b", "banned phrase: 'serves as' - just say 'is'"),
+
+    # Banned words (flagged in live corrections)
+    (r"(?i)\bwhack[- ]?a[- ]?mole\b", "banned: 'whack-a-mole' -- plain it out (e.g. 'each fix caused the next problem')"),
+
+    # Sycophantic
+    (r"(?i)^great\s+question!", "banned phrase: 'Great question!' - just answer it"),
+    (r"(?i)^absolutely!", "banned phrase: 'Absolutely!' - forced enthusiasm"),
+    (r"(?i)that'?s\s+a\s+(?:great|fantastic|excellent)\s+(?:point|question|observation)", "banned phrase: sycophantic acknowledgment - answer directly"),
+
+    # Filler closers
+    (r"(?i)(?:^|\.\s+)let\s+that\s+sink\s+in\.?$", "banned phrase: 'Let that sink in.' - trust the reader"),
+    (r"(?i)(?:^|\.\s+)read\s+that\s+again\.?$", "banned phrase: 'Read that again.' - LinkedIn filler"),
+
+    # Vague attributions (from unslop merge, 2026-08-18) — a claim with no real source is slop
+    (r"(?i)\bstudies\s+show\b", "vague attribution: 'studies show' - cite the actual study or drop the claim"),
+    (r"(?i)\bresearch(?:ers)?\s+(?:show|shows|suggest|suggests|indicate|indicates|have\s+found)\b", "vague attribution: 'research shows' - name the source or cut it"),
+    (r"(?i)\bexperts?\s+(?:say|agree|believe|recommend)\b", "vague attribution: 'experts say' - who, specifically?"),
+    (r"(?i)\bit\s+is\s+widely\s+(?:known|believed|accepted|regarded|understood)\b", "vague attribution: 'it is widely known' - by whom? say it plainly or cut"),
+    (r"(?i)\b(?:many|most)\s+(?:believe|argue|would\s+agree)\b", "vague attribution: 'many believe' - name who, or state it as your own view"),
+    (r"(?i)\bcritics\s+(?:argue|say|claim)\b", "vague attribution: 'critics argue' - which critics?"),
+
+    # AI tool-remnant markers - literal ChatGPT/Gemini leakage, never acceptable (Wikipedia signs-of-AI, 2026-08-27)
+    (r":?contentReference\[", "AI tool remnant: 'contentReference[' - ChatGPT artifact, delete it"),
+    (r"(?i)\[oaicite:", "AI tool remnant: '[oaicite:' - ChatGPT artifact, delete it"),
+    (r"\[cite:\s*\d+\]", "AI tool remnant: '[cite: N]' - Gemini artifact, delete it"),
+    (r"(?i)\bturn\d+(?:file|search|news|view|image)\d+", "AI tool remnant: a 'turn0search1'-style token leaked into text, delete it"),
+
+    # Chatbot outros / collaborative communication (Wikipedia signs-of-AI)
+    (r"(?i)\bI\s+hope\s+this\s+helps\b", "chatbot outro: 'I hope this helps' - cut it"),
+    (r"(?i)\b(?:feel\s+free|don'?t\s+hesitate)\s+to\s+(?:reach\s+out|ask|let\s+me\s+know|contact)", "chatbot outro: 'feel free to reach out' - cut it"),
+    (r"(?i)\bif\s+you\s+have\s+any\s+(?:other\s+)?questions", "chatbot outro: 'if you have any questions' - cut it"),
+
+    # Significance/legacy puffery (Wikipedia signs-of-AI: undue emphasis on importance)
+    (r"(?i)\bstands?\s+as\s+a\s+testament\s+to\b", "puffery: 'stands as a testament to' - show it, do not proclaim it"),
+    (r"(?i)\bmark(?:s|ing|ed)?\s+a\s+pivotal\s+moment\b", "puffery: 'marks a pivotal moment' - overstatement"),
+    (r"(?i)\b(?:cement(?:ed|ing|s)?|solidif(?:ied|ying|ies))\s+(?:its|his|her|their)\s+(?:legacy|status|place|role|position)\b", "puffery: 'cemented its legacy/status' - AI significance-inflation"),
+
+    # Vague / landing metaphors (2026-08-27, "here's where it lands" kind of thing)
+    (r"(?i)\b(?:here'?s|there'?s|that'?s|this\s+is)\s+where\s+(?:it|that|this|things|we|they|everything|the\s+\w+)\s+(?:lands?|comes?\s+in|shines?|matters?|begins?|happens?|gets\s+\w+)\b",
+     "vague landing metaphor: 'here's where it lands / comes in / shines' - say the concrete thing"),
+    (r"(?i)\bwhere\s+(?:it|everything|the\s+magic|the\s+rubber)\s+(?:lands?|happens?|meets\s+the\s+road)\b",
+     "dead metaphor: 'where it lands / where the magic happens / where the rubber meets the road' - name the actual thing"),
+    (r"(?i)\bmoves?\s+the\s+needle\b", "dead metaphor: 'moves the needle' - state the actual effect"),
+    (r"(?i)\bthe\s+missing\s+piece\b", "dead metaphor: 'the missing piece' - name what is actually missing"),
+    (r"(?i)\bthe\s+right\s+lever\b", "dead metaphor: 'the right lever' - name the actual action"),
+    (r"(?i)\bat\s+the\s+end\s+of\s+the\s+day\b", "filler: 'at the end of the day' - cut it, state the point"),
+    (r"(?i)\bthe\s+name\s+of\s+the\s+game\b", "cliche: 'the name of the game' - say the actual priority"),
+    (r"(?i)\bwhen\s+it\s+comes\s+to\b", "filler opener: 'when it comes to' - start with the point"),
+
+    # Manufactured-candor openers and TikTok aphorisms
+    (r"(?i)^(?:honestly|genuinely)[,?]", "manufactured candor: 'Honestly,' / 'Genuinely,' as an opener - cut it, the sentence stands on its own"),
+    (r"(?i)^(?:real\s+talk|i'?ll\s+be\s+honest|here'?s\s+the\s+truth|let\s+me\s+be\s+real)\b", "manufactured candor: 'Real talk' / 'I'll be honest' - cut the opener"),
+    (r"(?i)\bhits?\s+different\b", "aphorism: 'hits different' - say what is different"),
+    (r"(?i)\b\w+,?\s+but\s+make\s+it\s+\w+", "aphorism: 'X but make it Y' - describe the actual thing"),
+    (r"(?i)\b(?:iykyk|if\s+you\s+know,?\s+you\s+know)\b", "aphorism: 'iykyk' - say it or cut it"),
+    (r"(?i)\bit\s+came\s+back\s+(?:null|empty|surprising|clean|exactly)\b", "passive result rhythm: 'it came back X' - name what was found"),
+    (r"(?i)\boperationali[sz]", "tech-bro abstraction: 'operationalize' - say what will actually be done"),
+
+    # Hook-and-reveal rhythms (added 2026-09-05)
+    (r"(?i)(?:^|[.!:]\s+)(?:the\s+)?(?:best|worst|crazy|craziest|wild|wildest|funny|scary|hard|harsh|brutal|honest|real|good|bad|plot)\s+(?:part|thing|truth|news|twist)\?\s+\S",
+     "elliptical setup: 'the best part? ...' / 'crazy thing? ...' - a question fragment as a drumroll; state the point"),
+    (r"(?i)(?:^|[.!:]\s+)(?:the\s+)?(?:catch|kicker|twist|result|secret|truth|problem|thing|lesson|takeaway|upshot|reality|irony|answer|difference|reason)\?\s+\S",
+     "suspense-then-answer: 'the catch? ...' / 'the truth? ...' - drop the fake question, write the sentence"),
+    (r"(?i)\b(?:the\s+truth\s+is|truth\s+is|let'?s\s+be\s+(?:honest|real|clear)|here'?s\s+the\s+(?:thing|deal|truth|reality|catch|kicker)|here'?s\s+what\s+(?:nobody|no\s+one|most\s+people))\b",
+     "unneeded justifier: 'here's the thing' / 'the truth is' / 'let's be honest' - cut the wind-up"),
+    (r"(?i)\b(?:what\s+)?(?:nobody|no\s+one|no-one|they)\s+(?:tells?|talks?\s+about|says?|wants?\s+you\s+to\s+know|mentions?)\b[^.]{0,40}\b(?:you|out\s+loud|this|that)\b",
+     "revelation hook: 'what nobody tells you' / 'the thing nobody says out loud' - name the fact, skip the conspiracy"),
+    (r"(?i)\b(?:the\s+secret\s+to|the\s+one\s+thing|the\s+real\s+reason)\b", "revelation hook: 'the secret to' / 'the one thing' / 'the real reason' - just say it"),
+    (r"(?i)\bwhat\s+\w+(?:\s+\w+){0,3}\s+(?:actually|really)\s+(?:is|are|means?|does|do|looks?\s+like)\b",
+     "big-reveal frame: 'what X actually is' - state what it is"),
+    (r"(?i)\b(?:changes?\s+everything|game[- ]chang|mind[- ]blowing|you\s+won'?t\s+believe|stop\s+scrolling|nobody\s+is\s+talking\s+about|this\s+is\s+huge|blew\s+my\s+mind)\b",
+     "overhype: 'changes everything' / 'game-changer' / 'you won't believe' - the content should earn it; say the specific gain"),
+    (r"(?i)\b(?:will|to|could|can)\s+revolutioni[sz]e\b|\brevolutioni[sz](?:es|ed|ing)\b", "overhype: 'will revolutionize' - say what actually changes"),
+    (r"(?i)\b(?:fast|rapidly|ever|constantly)[- ]changing\s+(?:world|landscape|market|industry|environment|times)\b", "banned phrase: 'fast-changing world' - empty preamble"),
+    (r"(?i)\b(?:let'?s\s+)?(?:deep[- ])?div(?:e|ing)\s+(?:in|into|deep)\b", "banned phrase: 'dive into' / 'deep dive' - say 'look at' or name the thing"),
+    (r"(?i)\b(?:you|we|they|people|teams)\s+don'?t\s+need\s+(?:a\s+|an\s+|the\s+|more\s+)?\w+(?:\s+\w+){0,4}[,;.]\s*(?:you|we|they|people|teams)\s+need\b",
+     "opposing shutdown: 'you don't need X, you need Y' - a false choice; make the actual recommendation"),
+    (r"(?i)\b(?:is|are|was|were)\s+not\s+(?:\w+ing\s+)?\w+(?:\s+\w+){0,4},\s+(?:it'?s|they'?re|but)\s+(?:\w+ing\s+)?\w+|\b(?:isn'?t|aren'?t)\s+(?:about\s+)?\w+(?:\s+\w+){0,4},\s+(?:it'?s|they'?re|but)\s+",
+     "philosophical reduction: 'X is not Y, it's Z' - the not-X-but-Y reframe in a lab coat; state the claim plainly"),
+    (r"(?i)\bno\s+\w+(?:\s+\w+)?,\s+no\s+\w+(?:\s+\w+)?[,.]\s*(?:just|only)\s+\w+", "'no X, no Y, just Z' - a slogan shape; write the sentence"),
+]
+
+# ============================================================
+# DENSITY-FLAGGED WORDS (warning — tracked across full content)
+# ============================================================
+
+TIER1_WORDS = [
+    "delve", "utilize", "spearhead", "bolster", "underscore", "endeavor",
+    "foster", "harness", "streamline", "leverage", "pivotal", "multifaceted",
+    "holistic", "meticulous", "nuanced", "invaluable", "groundbreaking",
+    "tapestry", "synergy", "paradigm", "underpinnings", "linchpin",
+    "cornerstone", "catalyst", "nexus", "realm",
+]
+TIER1_THRESHOLD = 1  # per 500 words
+
+TIER2_WORDS = [
+    "transformative", "comprehensive", "crucial", "dynamic", "compelling",
+    "innovative", "vibrant", "profound", "ecosystem", "trajectory",
+    "furthermore", "moreover", "consequently", "notably", "indeed",
+    "additionally", "conversely", "nevertheless",
+    # Tech-metaphor nouns. AI reaches for these to sound operator-fluent.
+    # Density-flagged rather than banned: "rails" is also a real framework
+    # and a playbook is a real document.
+    "rails", "rail", "playbook", "flywheel", "moat", "primitives",
+]
+TIER2_THRESHOLD = 2  # per 500 words
+
+# ============================================================
+# STRUCTURAL PATTERNS (warning)
+# ============================================================
+
+EM_DASH = "—"
+
+FILLER_TRANSITIONS = [
+    r"(?i)^furthermore[,.]",
+    r"(?i)^moreover[,.]",
+    r"(?i)^it'?s\s+worth\s+noting\s+that",
+    r"(?i)^it\s+is\s+important\s+to\s+note\s+that",
+    r"(?i)^in\s+conclusion[,.]",
+    r"(?i)^(?:and\s+)?that\s+matters\.?$",
+    r"(?i)^and\s+honestly\??$",
+]
+
+# ============================================================
+# BLOCKING: curly quotes, Title Case headings, bold overuse (added 2026-08-18)
+# ============================================================
+
+CURLY_QUOTES = {"“", "”", "‘", "’"}  # " " ' '
+
+# Small words that a Title Case heading capitalizes mid-line but sentence case + proper nouns never do.
+# A capitalized one of these (not as the first word) is an unambiguous Title-Case tell with ~no false positives.
+TITLE_CASE_SMALL = {
+    "a", "an", "the", "and", "or", "nor", "but", "of", "to", "in", "on", "at",
+    "by", "for", "with", "from", "as", "vs", "via", "into", "onto", "over",
+}
+
+# ============================================================
+# BLOCKING: explainer furniture in headings (added 2026-09-02)
+#
+# A title that names the thing, then glosses the ARTIFACT rather than the subject:
+# "The system, in two pictures". The gloss describes the format ("in two pictures",
+# "at a glance", "explained", "a primer") and carries no information the body does not.
+# Deliberately narrow: a plain comma in a heading is legitimate and common (dates,
+# "X, or Y?" decision framings), so only the gloss shapes below block.
+# ============================================================
+
+# Nouns that describe the ARTIFACT rather than the subject. "in three weeks" is a
+# schedule and stays legal; "in three charts" is a format gloss and blocks.
+FORMAT_NOUNS = (
+    r"pictures?|charts?|graphs?|images?|slides?|numbers?|words?|lines?|minutes?|"
+    r"steps?|bullets?|paragraphs?|tables?|screenshots?|diagrams?|acts?|parts?|points?"
+)
+
+EXPLAINER_HEADINGS = [
+    (r"(?i),\s+in\s+(?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+(?:" + FORMAT_NOUNS + r")\s*$",
+     "explainer gloss heading: ', in N <format>' - the title already names the thing; drop the gloss"),
+    (r"(?i),?\s+at\s+a\s+glance\s*$",
+     "explainer gloss heading: 'at a glance' - drop it; the content is the glance"),
+    (r"(?i),\s+explained\s*$",
+     "explainer suffix heading: ', explained' - the body is the explanation; drop the label"),
+    (r"(?i),\s+a\s+primer\s*$",
+     "explainer suffix heading: ', a primer' - drop it and name the subject"),
+    (r"(?i)^(?:a\s+)?primer\s+on\s+\S",
+     "explainer suffix heading: 'a primer on X' - just name X"),
+    (r"(?i)[a-z]\s+101\s*$",
+     "explainer suffix heading: 'X 101' - drop the 101; name what it covers"),
+    (r"(?i)^what\s+(?:this|that|it)\s+means\s+for\s+you\s*$",
+     "explainer heading: 'what this means for you' - say what it means in the body"),
+    (r"(?i),\s+and\s+wh(?:y|at)\s+it\s+(?:matters|means)\s*$",
+     "why-it-matters tail: ', and why it matters' - if it matters, the body shows it"),
+    (r"(?i)^why\s+it\s+matters\s*$",
+     "why-it-matters heading: state the stake itself, not that there is one"),
+]
+
+# BLOCKING: interface copy that narrates itself (added 2026-10-08)
+#
+# An app does not explain itself. A subtitle that says what the screen is for, or a line
+# that tells the reader how to press a control, is the machine default: every screen gets a
+# heading, then a sentence restating the heading as an instruction. Deliberately narrow:
+# only shapes that are never a label or a real error. "View statements" as a button passes;
+# "Click here to view your statements" blocks. The wider judgment (any subtitle that is not
+# functional) lives in references/copy-slop-dictionary.md for the review.
+# ============================================================
+INTERFACE_NARRATION = [
+    (r"(?i)\b(?:click|tap|press)\s+(?:here|below|the\s+(?:button|link)(?:\s+below)?)\s+to\b",
+     "interface narration: 'click here to' - name the action on the control and drop the sentence"),
+    (r"(?i)\bhere\s+you(?:\s+can|\s+will|'ll)\s+(?:find|see|view|manage|access)\b",
+     "interface narration: 'here you can find' - the screen shows it; delete the line"),
+    (r"(?i)\b(?:use|visit)\s+this\s+(?:page|screen|section|tab|form)\s+to\b",
+     "interface narration: 'use this page to' - the heading names the page; delete the line"),
+    (r"(?i)\bthis\s+(?:page|screen|section|tab|dashboard)\s+(?:lets|allows|enables|helps)\s+you\b",
+     "interface narration: 'this page lets you' - delete the line"),
+    (r"(?i)\bthis\s+(?:page|screen|section|tab|dashboard)\s+(?:shows|displays|lists|contains)\b",
+     "interface narration: 'this page shows' - the content is on the page; delete the line"),
+    (r"(?i)\b(?:sign|log)\s+in\s+to\s+(?:see|view|access|manage)\s+your\b",
+     "interface narration: 'sign in to see your' - the sign-in button is enough; delete the subtitle"),
+    (r"(?i)\bbelow\s+(?:you(?:'ll|\s+will|\s+can)\s+(?:find|see)|is\s+a\s+(?:list|summary|breakdown)\s+of)\b",
+     "interface narration: 'below you will find' - delete the line and show the thing"),
+]
+
+# BLOCK: a comma in a short display heading (added 2026-09-16). The rule: if a headline
+# needs a comma it is usually two ideas and too long. Scoped to short headings so long
+# list-style headings and ordinary doc headings are spared. Excluded, to match the
+# existing legitimate cases: a date ("September 4, 2026"), an "X, or Y?" decision framing,
+# an "X, or ..." explanatory heading ("Circle invites, or how circles grow"), and a
+# schedule gloss ("Migration, in three weeks").
+HEADLINE_COMMA_MAX_WORDS = 6
+
+# ============================================================
+# BLOCKING: density (added 2026-09-02)
+#
+# Two mechanical forms of overexplaining. RESTATEMENT is the same point twice in a
+# row; THROAT-CLEARING is an abstract opener before any substance (dictionary calls
+# this "The Warm-Up Problem" - the first 40% of AI content).
+# ============================================================
+
+# Tuned against a 648-file corpus. Parallel enumeration (two ticket rows, ToS vs privacy
+# policy, "Sprint Planning" vs "Sprint Review") shares scaffolding and topped out at 0.83
+# overlap; genuine restatement reuses nearly every word and scores 0.9 to 1.0. Anything
+# below 0.9 blocked legitimate parallel lists, so 0.9 is the floor.
+#
+# Known limit: this catches near-verbatim repeats only. The synonym form ("The system is
+# fast." / "It is quick.") scores ~0.2 and is invisible here - that one stays a judgment
+# tell for the review gate.
+RESTATEMENT_MIN_CONTENT_WORDS = 5   # below this, overlap is noise
+RESTATEMENT_OVERLAP = 0.9           # share of the shorter unit's content words
+
+STOPWORDS = {
+    "a", "an", "the", "and", "or", "but", "if", "then", "than", "that", "this", "these",
+    "those", "is", "are", "was", "were", "be", "been", "being", "am", "do", "does", "did",
+    "have", "has", "had", "will", "would", "can", "could", "should", "may", "might", "must",
+    "of", "to", "in", "on", "at", "by", "for", "with", "from", "as", "into", "onto", "over",
+    "under", "about", "after", "before", "between", "through", "during", "without", "within",
+    "it", "its", "we", "our", "you", "your", "they", "their", "he", "she", "his", "her",
+    "not", "no", "so", "up", "out", "off", "down", "just", "only", "also", "more", "most",
+    "which", "what", "when", "where", "who", "whom", "how", "why", "there", "here", "all",
+    "any", "each", "both", "some", "such", "one", "two", "very", "much", "many", "still",
+}
+
+# WARN: wordy phrases, false ranges, AI disclaimers (from unslop merge, 2026-08-18).
+# Warnings, not blocks - these are context-dependent (a real range or a genuine "because" is fine).
+WEAK_PHRASES = [
+    (r"(?i)\bdue\s+to\s+the\s+fact\s+that\b", "wordy: 'due to the fact that' -> 'because'"),
+    (r"(?i)\bin\s+order\s+to\b", "wordy: 'in order to' -> 'to'"),
+    (r"(?i)\bat\s+(?:this|that)\s+point\s+in\s+time\b", "wordy: 'at this point in time' -> 'now'"),
+    (r"(?i)\ba\s+(?:large|small)\s+number\s+of\b", "wordy: 'a large/small number of' -> 'many'/'few'"),
+    (r"(?i)\bin\s+the\s+event\s+that\b", "wordy: 'in the event that' -> 'if'"),
+    (r"(?i)\bfor\s+the\s+purpose\s+of\b", "wordy: 'for the purpose of' -> 'to'"),
+    (r"(?i)\bhas\s+the\s+ability\s+to\b", "wordy: 'has the ability to' -> 'can'"),
+    (r"(?i)\beverything\s+from\s+\w+\s+to\s+\w+", "false range: 'everything from X to Y' -- list the real items or cut"),
+    (r"(?i)\bbased\s+on\s+the\s+(?:information|data)\s+(?:provided|available)\b", "AI disclaimer: 'based on the information provided' -- just answer"),
+    (r"(?i)\bit\s+appears\s+that\b", "hedge: 'it appears that' -- say what is, or name the uncertainty concretely"),
+    # --- unslop merge 2, added 2026-08-27: weak copulas, empty -ing tails, abstract jargon ---
+    (r"(?i)\b(?:serves|stands)\s+as\b", "weak copula: 'serves/stands as' -- just say what it is ('is', 'runs', 'handles')"),
+    (r"(?i)\bboasts\b", "puffery verb: 'boasts' -- use a plain verb ('has', 'includes')"),
+    (r"(?i),\s+(?:highlighting|showcasing|underscoring|emphasizing|reflecting|ensuring|demonstrating)\s+", "empty -ing tail: ', highlighting/ensuring...' -- start a new sentence with the concrete point"),
+    (r"(?i)\b(?:substrate|nexus|paradigm|flywheel|north\s+star)\b", "abstract jargon-as-technical -- name the concrete thing instead"),
+    # --- Wikipedia signs-of-AI merge, 2026-08-27 ---
+    (r"(?i)\bin\s+connection\s+with\b", "vague connection: 'in connection with' -- use a direct preposition (about, for, with)"),
+    (r"(?i)\b(?:prioriti|emphasi|favou?r)\w*\s+[\w-]+\s+rather\s+than\s+[\w-]+", "negative parallelism: '...ing X rather than Y' -- state it plainly"),
+    (r"[?&]utm_source=", "copied-from-web tell: 'utm_source=' in a URL -- strip campaign tracking params"),
+]
+
+
+def is_prose_file(file_path):
+    if not file_path:
+        return False
+    if any(skip in file_path for skip in SKIP_PATTERNS):
+        return False
+    ext = os.path.splitext(file_path)[1].lower()
+    return ext in PROSE_EXTENSIONS
+
+
+def is_source_file(file_path):
+    if not file_path:
+        return False
+    if any(skip in file_path for skip in SKIP_PATTERNS):
+        return False
+    ext = os.path.splitext(file_path)[1].lower()
+    return ext in SOURCE_EXTENSIONS
+
+
+def extract_string_literals(content):
+    """Extract string literals from source code for slop checking."""
+    strings = []
+    # Match quoted strings (both single and double), handling escapes
+    for match in re.finditer(r'(?:"([^"\\]*(?:\\.[^"\\]*)*)"|\'([^\'\\]*(?:\\.[^\'\\]*)*)\')', content):
+        s = match.group(1) or match.group(2)
+        if s and len(s) > 20:  # only check non-trivial strings
+            strings.append(s)
+    return "\n".join(strings)
+
+
+def check_banned_phrases(content):
+    """Check for zero-tolerance banned phrases. Returns list of (line_num, message)."""
+    violations = []
+    lines = content.split("\n")
+
+    for i, line in enumerate(lines, 1):
+        stripped = re.sub(r"^#{1,6}\s+", "", line.strip())
+        if not stripped or stripped.startswith("<!--"):
+            continue
+
+        for pattern, msg in BANNED_PHRASES:
+            if re.search(pattern, stripped):
+                violations.append((i, f"[BLOCK] {msg}"))
+                break  # one violation per line
+
+    return violations
+
+
+def check_word_density(content):
+    """Check for AI-flagged words at excessive density. Returns list of warnings."""
+    warnings = []
+    words = content.lower().split()
+    word_count = len(words)
+
+    if word_count < 50:  # too short to judge density
+        return warnings
+
+    blocks_of_500 = max(1, word_count / 500)
+
+    # Tier 1
+    for word in TIER1_WORDS:
+        count = sum(1 for w in words if w.strip(".,;:!?\"'()") == word)
+        if count > TIER1_THRESHOLD * blocks_of_500:
+            warnings.append(f"[DENSITY] '{word}' appears {count}x in {word_count} words - strong AI signal (Tier 1)")
+
+    # Tier 2
+    for word in TIER2_WORDS:
+        count = sum(1 for w in words if w.strip(".,;:!?\"'()") == word)
+        if count > TIER2_THRESHOLD * blocks_of_500:
+            warnings.append(f"[DENSITY] '{word}' appears {count}x in {word_count} words - moderate AI signal (Tier 2)")
+
+    return warnings
+
+
+def check_filler_transitions(content):
+    """Check for AI filler transitions."""
+    warnings = []
+    lines = content.split("\n")
+
+    for i, line in enumerate(lines, 1):
+        stripped = line.strip()
+        for pattern in FILLER_TRANSITIONS:
+            if re.search(pattern, stripped):
+                warnings.append((i, f"[FILLER] Line starts with AI filler transition - cut it and start with the point"))
+                break
+
+    return warnings
+
+
+def check_weak_phrases(content):
+    """WARN: wordy phrases, false ranges, AI disclaimers. Returns (line_num, msg)."""
+    warnings = []
+    for i, line in enumerate(content.split("\n"), 1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or stripped.startswith("<!--"):
+            continue
+        for pattern, msg in WEAK_PHRASES:
+            if re.search(pattern, stripped):
+                warnings.append((i, f"[WEAK] {msg}"))
+                break
+    return warnings
+
+
+def check_curly_quotes(content):
+    """BLOCK: smart/curly quotes - use straight ASCII."""
+    violations = []
+    for i, line in enumerate(content.split("\n"), 1):
+        if any(c in line for c in CURLY_QUOTES):
+            violations.append((i, "[BLOCK] curly/smart quotes - use straight ASCII quotes (\" and ')"))
+    return violations
+
+
+def check_title_case_headings(content):
+    """BLOCK: a markdown heading in Title Case (a small word Capitalized mid-heading)."""
+    violations = []
+    for i, line in enumerate(content.split("\n"), 1):
+        m = re.match(r"^\s*#{1,6}\s+(.+)", line)
+        if not m:
+            continue
+        words = m.group(1).split()
+        for w in words[1:]:  # skip the first word (sentence case caps it too)
+            core = re.sub(r"[^A-Za-z]", "", w)
+            if core.lower() in TITLE_CASE_SMALL and core[:1].isupper():
+                violations.append((i, "[BLOCK] Title Case heading - use sentence case (capitalize only the first word + proper nouns)"))
+                break
+    return violations
+
+
+def check_bold_overuse(content):
+    """BLOCK: bold peppered through a flowing prose paragraph (decoration, not emphasis).
+    Skips label-led lines (starting with ** or a list/heading/table marker) - those are legit style."""
+    violations = []
+    for para in re.split(r"\n\s*\n", content):
+        p = para.strip()
+        if not p or p.startswith(("#", "-", "*", "|", "`", ">")):
+            continue
+        bolds = len(re.findall(r"\*\*[^*\n]+\*\*", p))
+        sentences = len(re.findall(r"[.!?](?:\s|$)", p))
+        if bolds >= 4 and sentences >= 2 and len(p.split()) >= 40:
+            violations.append((0, f"[BLOCK] bold overused ({bolds} bold spans in one prose paragraph) - bold is for rare emphasis, not decoration"))
+    return violations
+
+
+def check_bold_lead_paragraph(content):
+    """BLOCK: the 'bold title. then body' paragraph tell (2026-08-28).
+    A bold fragment used as a sentence-title, period-terminated, then body prose in the
+    same paragraph — e.g. '**Evidence boundary.** A format-valid timestamp confirms...'.
+    Scoped to a PERIOD-terminated bold lead so it does NOT hit '**Label:** value' lines
+    (colon, used in memory files) or ordinary mid-sentence emphasis."""
+    violations = []
+    patterns = [
+        r"\*\*[^*\n]{2,70}\.\*\*\s+[A-Z0-9]",   # **Title.** Body
+        r"\*\*[^*\n]{2,70}\*\*\.\s+[A-Z0-9]",   # **Title**. Body
+        r"<strong[^>]*>[^<]{2,70}\.</strong>\s+[A-Z0-9]",   # <strong>Title.</strong> Body
+        r"<strong[^>]*>[^<]{2,70}</strong>\.\s+[A-Z0-9]",   # <strong>Title</strong>. Body
+    ]
+    for i, line in enumerate(content.split("\n"), 1):
+        for pat in patterns:
+            if re.search(pat, line):
+                violations.append((i, "[BLOCK] bold-lead paragraph ('**Title.** then body') - an AI tell; drop the bold pseudo-title, just write the sentence"))
+                break
+    return violations
+
+
+def check_middot_separator(content):
+    """BLOCK: spaced middot separator ' · ' used as connective tissue (2026-08-28).
+    An AI tell in copy ('Jan · Jul', 'DBM · Open Gov'). Use a plain word, comma, or line break."""
+    violations = []
+    for i, line in enumerate(content.split("\n"), 1):
+        if re.search(r"\s·\s", line):
+            violations.append((i, "[BLOCK] ' · ' middot separator - an AI tell; use a word, comma, or separate line"))
+    return violations
+
+
+EMOJI_RANGE = "\U0001F300-\U0001FAFF\u2600-\u27BF\u2B00-\u2BFF"
+
+
+def check_emoji_bullets(content):
+    """BLOCK: an emoji used as a bullet or a line opener."""
+    violations = []
+    for i, line in enumerate(content.split("\n"), 1):
+        if re.match(r"^\s*(?:[-*+]\s+)?[" + EMOJI_RANGE + r"]\ufe0f?\s+\S", line):
+            violations.append((i, "[BLOCK] emoji as a bullet or line opener - cut it; the words carry it"))
+    return violations
+
+
+def check_uniform_sentences(content):
+    """BLOCK: a paragraph of four or more sentences all within one word of the same length."""
+    violations = []
+    cleaned = _strip_code_and_tables(content)
+    for para in re.split(r"\n\s*\n", cleaned):
+        p = para.strip()
+        if not p or p.startswith(("#", "-", "*", "`", "|", ">")):
+            continue
+        counts = [len(sn.split()) for sn in _split_sentences(p) if sn.split()]
+        if len(counts) >= 4 and max(counts) - min(counts) <= 1 and min(counts) >= 4:
+            line_no = 0
+            for i, line in enumerate(content.split("\n"), 1):
+                if p[:40] in line:
+                    line_no = i
+                    break
+            violations.append((line_no, f"[BLOCK] every sentence in this paragraph is {min(counts)} to {max(counts)} words - one rhythm is a tell; vary the length"))
+    return violations
+
+
+RHYTHM_CLOSER_LEADS = (
+    "treat ", "think of ", "call it ", "that is the ", "that's the ", "this is the ",
+    "which is ", "and that is ", "and that's ", "so that is ", "so that's ",
+)
+
+
+def check_label_every_block(content):
+    """BLOCK: a standalone bold line used as a section label, repeatedly (2026-09-23).
+
+    The tell is a document that announces each block before saying anything: a line that is
+    nothing but **Customer Support** or <strong>Operations</strong>, then the content under
+    it. Markdown already has headings; a bold pseudo-heading is a labelling tic. One is a
+    judgement call, three is a pattern. At three it hits 6 of 400 vault files, and those are
+    spec files (profile.md, voice-learning.md) that use labels deliberately. Raise to four if
+    that nags.
+    """
+    violations = []
+    hits = []
+    for i, line in enumerate(content.split("\n"), 1):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if re.fullmatch(r"\*\*[^*\n]{2,60}\*\*:?", stripped) or \
+           re.fullmatch(r"<strong[^>]*>[^<]{2,60}</strong>:?", stripped) or \
+           re.fullmatch(r"<b>[^<]{2,60}</b>:?", stripped):
+            hits.append(i)
+    if len(hits) >= 3:
+        violations.append((hits[0], f"[BLOCK] bold pseudo-heading on {len(hits)} blocks - labelling every block before you say anything is an AI tell; use a real heading or just write the paragraph"))
+    return violations
+
+
+def check_stacked_short_sentences(content):
+    """BLOCK: three or more short sentences in a row, all about the same length (2026-09-23).
+
+    Looser than check_uniform_sentences, which needs four sentences within one word of each
+    other. The tell here is the marching rhythm of three clipped declaratives, nine words or
+    fewer and within two words of each other: every clause
+    the same weight, nothing subordinated. Real writing subordinates - it trails the reason
+    on 'since', 'so' or 'because' instead of starting a new sentence for it.
+    """
+    violations = []
+    cleaned = _strip_code_and_tables(content)
+    for para in re.split(r"\n\s*\n", cleaned):
+        p = para.strip()
+        if not p or p.startswith(("#", "-", "*", "`", "|", ">")):
+            continue
+        sents = [sn for sn in _split_sentences(p) if sn.split()]
+        counts = [len(sn.split()) for sn in sents]
+        for j in range(len(counts) - 2):
+            window = counts[j:j + 3]
+            if max(window) <= 9 and max(window) - min(window) <= 2 and min(window) >= 3:
+                line_no = 0
+                for k, line in enumerate(content.split("\n"), 1):
+                    if p[:40] in line:
+                        line_no = k
+                        break
+                violations.append((line_no, f"[BLOCK] three short sentences in a row at {min(window)} to {max(window)} words - a marching rhythm is a tell; join two and trail the reason on 'since' or 'so'"))
+                break
+    return violations
+
+
+def check_landing_closer(content):
+    """BLOCK: a paragraph that ends on a short line built to land (2026-09-23).
+
+    The aphorism close: a long sentence carrying the content, then a clipped abstract one
+    that adds no fact and exists to sound final ('Treat release day as a non-event.').
+    Fires only when the closer is short, carries no number or proper noun, and follows a
+    sentence at least twice its length, so a genuinely short factual last line survives.
+    """
+    violations = []
+    cleaned = _strip_code_and_tables(content)
+    for para in re.split(r"\n\s*\n", cleaned):
+        p = para.strip()
+        if not p or p.startswith(("#", "-", "*", "`", "|", ">")):
+            continue
+        sents = [sn for sn in _split_sentences(p) if sn.split()]
+        if len(sents) < 2:
+            continue
+        last, prev = sents[-1], sents[-2]
+        lw, pw = len(last.split()), len(prev.split())
+        if lw > 9 or lw < 3 or pw < 2 * lw:
+            continue
+        body = last.rstrip(".!?")
+        if re.search(r"\d", body):
+            continue
+        # a capitalised word after the first is a proper noun, so the line carries a fact
+        if any(w[:1].isupper() for w in body.split()[1:]):
+            continue
+        low = body.lower()
+        aphorism = (low.startswith(RHYTHM_CLOSER_LEADS)
+                    or re.search(r"\bis (?:the|what|why|how)\b", low)
+                    or re.search(r"\b(?:the point|the whole point|the difference|what matters)\b", low))
+        if not aphorism:
+            continue
+        line_no = 0
+        for k, line in enumerate(content.split("\n"), 1):
+            if last[:40] in line:
+                line_no = k
+                break
+        violations.append((line_no, "[BLOCK] closing line built to land ('" + body[:40] + "') - it adds no fact; delete it or replace it with the thing it is gesturing at"))
+    return violations
+
+
+def check_structural_tics(content):
+    """BLOCK: rhythm-level tells that need more than a phrase match."""
+    violations = []
+    checks = [
+        (r"\?\s+[A-Z][^?\n]{0,30}\?\s+[A-Z][^?\n]{0,30}\?", "rhetorical-question pile-up (three short questions, no answer) - answer one or cut them"),
+        (r"\bNot\s+[^.\n]{1,30}\.\s+Not\s+[^.\n]{1,30}\.", "'Not X. Not Y.' negation ladder - state the actual figure or fact"),
+        (r"(?i)^either\s+[^.\n]{3,60}\s+or\s+[^.\n]{3,60}\.\s*$", "either-or reductive framing - name the real options, or drop the frame"),
+        (r"\bthe-\w+(?:-\w+){2,}\b", "hyphenated-compound title ('the-thing-that-broke story') - write the phrase out"),
+        (r"(?i)\b(\w{4,}(?:ly|ive|ful|ous|al|ic|ate|ent)),\s+(\w{4,}(?:ly|ive|ful|ous|al|ic|ate|ent)),\s+(?:and\s+)?(\w{4,}(?:ly|ive|ful|ous|al|ic|ate|ent))\b", "three adjectives in a row ('specific, careful, deliberate') - keep the one that carries the point"),
+        (r"(?i)(?:^|[.!?]\s+)[A-Z]?\w+\.\s+\w+\.\s+\w+\.(?:\s|$)", "law of threes ('Fast. Cheap. Done.') - three one-word sentences as a beat; write one sentence"),
+        (r"(?i)\b\w+,\s+\w+,\s+\w+\.\s*$", "law of threes: a sentence that closes on three single words with no 'and' - cut to the one that matters, or say why all three"),
+    ]
+    for i, line in enumerate(content.split("\n"), 1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith(("<!--", "```", "|")):
+            continue
+        for pattern, msg in checks:
+            if re.search(pattern, stripped):
+                violations.append((i, f"[BLOCK] {msg}"))
+                break
+    return violations
+
+
+def extract_content(tool_name, tool_input):
+    if tool_name == "Write":
+        return tool_input.get("content", "")
+    elif tool_name == "Edit":
+        return tool_input.get("new_string", "")
+    elif tool_name == "MultiEdit":
+        edits = tool_input.get("edits", [])
+        return "\n".join(edit.get("new_string", "") for edit in edits)
+    return ""
+
+
+def _heading_texts(content):
+    """Yield (line_num, heading_text) for markdown # headings and HTML <h1-h6>."""
+    for i, line in enumerate(content.split("\n"), 1):
+        m = re.match(r"^\s*#{1,6}\s+(.+?)\s*$", line)
+        if m:
+            yield i, m.group(1).strip()
+            continue
+        for hm in re.finditer(r"(?is)<h[1-6][^>]*>(.*?)</h[1-6]>", line):
+            text = re.sub(r"(?s)<[^>]+>", "", hm.group(1))
+            text = html.unescape(text).strip()
+            if text:
+                yield i, text
+
+
+def check_explainer_headings(content):
+    """BLOCK: a heading that glosses the artifact instead of naming the subject."""
+    violations = []
+    for i, text in _heading_texts(content):
+        # Strip trailing markdown emphasis/punctuation that would hide an end anchor.
+        probe = text.rstrip("*_`#").rstrip()
+        matched = False
+        for pattern, msg in EXPLAINER_HEADINGS:
+            if re.search(pattern, probe):
+                violations.append((i, f"[BLOCK] {msg}"))
+                matched = True
+                break
+        if matched:
+            continue
+        if "," in probe:
+            words = len(re.findall(r"\S+", probe))
+            date_comma = re.search(r",\s*\d", probe)          # "September 4, 2026", "Q3, 2026"
+            decision = probe.rstrip().endswith("?")            # "Apply, or subscribe?"
+            or_framing = re.search(r",\s+or\s+", probe, re.I)  # "Circle invites, or how circles grow"
+            schedule = re.search(                              # "Migration, in three weeks"
+                r",\s+in\s+(?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+"
+                r"(?:second|minute|hour|day|week|month|year|quarter)s?\b", probe, re.I)
+            if (words <= HEADLINE_COMMA_MAX_WORDS
+                    and not date_comma and not decision and not or_framing and not schedule):
+                violations.append((i, '[BLOCK] comma in a short heading - a headline that needs a comma is usually two ideas; shorten or split it (e.g. "One login, every tool" -> "One login")'))
+        # A heading broken into two terse sentence-fragments ("Four rails. One
+        # job each.") is the two-beat cadence - swapping a comma for a period
+        # is not a fix. Use the plain noun phrase and let the subhead carry the
+        # rest. Split on an internal period/exclamation followed by a capital.
+        # Split only where the period follows a letter, so a numbered heading
+        # ("1. Prerequisites", "Step 2. Do it") does not read as two fragments.
+        core = probe.rstrip()
+        segs = [s.strip() for s in re.split(r"(?<=[A-Za-z][.!])\s+(?=[A-Z0-9])", core) if s.strip()]
+        if len(segs) >= 2:
+            seg_words = [len(re.findall(r"\S+", s)) for s in segs]
+            abbrev = re.compile(r"^([A-Za-z]\.){1,}[A-Za-z]?\.?$")   # U.S., e.g., i.e.
+            if (sum(seg_words) <= 8 and all(w <= 4 for w in seg_words)
+                    and not any(abbrev.match(s) for s in segs)):
+                violations.append((i, '[BLOCK] staccato heading - two terse fragments like "Four rails. One job each." is an AI two-beat cadence; use the plain noun phrase and let the subhead carry the rest'))
+    return violations
+
+
+def check_interface_narration(content):
+    """BLOCK: a line that explains the interface or tells the reader how to use a control."""
+    violations = []
+    for i, line in enumerate(content.split("\n"), 1):
+        for pattern, msg in INTERFACE_NARRATION:
+            if re.search(pattern, line):
+                violations.append((i, f"[BLOCK] {msg}"))
+                break
+    return violations
+
+
+def _content_words(text):
+    """Lowercased meaningful tokens: drops stopwords, punctuation, and short words.
+
+    Numbers, dates and identifiers are KEPT and never length-filtered. Parallel rows in
+    a log or ledger share their scaffolding and differ only in the values ("Aug 20" vs
+    "Aug 22", one ticket key vs another); dropping those values made distinct entries
+    look identical and was the main source of false positives.
+    """
+    tokens = re.findall(r"[A-Za-z][A-Za-z'-]*|\d[\w.:/-]*", text.lower())
+    out = set()
+    for t in tokens:
+        if any(ch.isdigit() for ch in t):
+            out.add(t)
+        elif len(t) > 3 and t not in STOPWORDS:
+            out.add(t)
+    return out
+
+
+# A line carrying this many tags is markup, not prose. Minified HTML puts a whole
+# page on one line, and splitting that on sentence punctuation compares fragments of
+# markup rather than sentences.
+MARKUP_TAG_LIMIT = 3
+
+
+def _strip_code_and_tables(content):
+    """Drop fenced code blocks, markdown table rows, and markup-heavy lines.
+
+    All three repeat by design: a table restates its column shape every row, a code
+    block restates its idiom, and a minified HTML line is not prose at all.
+    """
+    out, in_fence = [], False
+    for line in content.split("\n"):
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
+            out.append("")
+            continue
+        if in_fence or line.lstrip().startswith("|"):
+            out.append("")
+            continue
+        if len(re.findall(r"<[a-zA-Z/!][^>]*>", line)) >= MARKUP_TAG_LIMIT:
+            out.append("")
+            continue
+        out.append(line)
+    return "\n".join(out)
+
+
+def _split_sentences(text):
+    parts = re.split(r"(?<=[.!?])\s+", text.strip())
+    return [p.strip() for p in parts if p.strip()]
+
+
+def check_restatement(content):
+    """BLOCK: two adjacent sentences or bullets that make the same point twice.
+
+    Compares content-word sets. Adjacent only - a callback to something said three
+    paragraphs up is legitimate; the same point restated immediately is padding.
+    """
+    violations = []
+    cleaned = _strip_code_and_tables(content)
+    lines = cleaned.split("\n")
+
+    units = []  # (line_num, text)
+
+    # Adjacent bullets at the same nesting level.
+    run = []
+    for i, line in enumerate(lines, 1):
+        m = re.match(r"^(\s*)(?:[-*+]|\d+[.)])\s+(.+)", line)
+        if m:
+            indent = len(m.group(1))
+            if run and run[-1][0] == indent:
+                units.append((run[-1][1], run[-1][2], i, m.group(2)))
+            run = [(indent, i, m.group(2))]
+        elif line.strip():
+            run = []
+
+    for prev_line, prev_text, cur_line, cur_text in units:
+        a, b = _content_words(prev_text), _content_words(cur_text)
+        if len(a) < RESTATEMENT_MIN_CONTENT_WORDS or len(b) < RESTATEMENT_MIN_CONTENT_WORDS:
+            continue
+        overlap = len(a & b) / min(len(a), len(b))
+        if overlap >= RESTATEMENT_OVERLAP:
+            violations.append((cur_line, "[BLOCK] restatement: this bullet repeats the previous one's point - say it once"))
+
+    # Adjacent sentences inside a prose paragraph.
+    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", cleaned) if p.strip()]
+    for para in paragraphs:
+        if para.startswith(("#", "-", "*", "`", "|", ">")):
+            continue
+        sentences = _split_sentences(para)
+        for s1, s2 in zip(sentences, sentences[1:]):
+            a, b = _content_words(s1), _content_words(s2)
+            if len(a) < RESTATEMENT_MIN_CONTENT_WORDS or len(b) < RESTATEMENT_MIN_CONTENT_WORDS:
+                continue
+            overlap = len(a & b) / min(len(a), len(b))
+            if overlap >= RESTATEMENT_OVERLAP:
+                line_no = 0
+                for i, line in enumerate(content.split("\n"), 1):
+                    if s2[:40] in line:
+                        line_no = i
+                        break
+                violations.append((line_no, "[BLOCK] restatement: this sentence repeats the previous one - delete it"))
+    return violations
+
+
+# ============================================================
+# SEND / DRAFT / COMMENT GATING (email, tickets, chat)
+# ============================================================
+# A send never touches a local file, so the file checks above never see it. These tools
+# carry the body in their own argument. Classify by the tool name and the payload shape,
+# pull the body, and run the right depth of check:
+#   chat  -> tells only. His chat voice is lowercase and fragmented; the prose-shape
+#            checks (title case, bold lead, uniform sentences, density) false-positive on it.
+#   prose -> full set. Email bodies and ticket comments are real prose.
+
+CHAT_NAME_HINTS = ("discord", "telegram", "teams", "imessage", "slack")
+EMAIL_NAME_HINTS = ("gmail", "outlook")
+TICKET_NAME_HINTS = ("jira", "wrike", "confluence")
+
+# Body-carrying keys, most specific first. Recipient keys are never pulled as body.
+BODY_KEYS = ("commentBody", "htmlBody", "body", "message", "text", "content",
+             "comment", "description", "markdown", "message_body", "note")
+SUBJECT_KEYS = ("subject", "title", "summary")
+# These keys in a payload mark it as mail even when the tool name is an opaque hash.
+EMAIL_SHAPE_KEYS = ("subject", "threadId", "replyToMessageId", "bcc", "cc")
+
+
+def _short_tool_name(tool_name):
+    return tool_name.split("__")[-1] if tool_name else tool_name
+
+
+BROWSER_NAME_HINTS = ("chrome", "browser", "playwright")
+TYPED_MIN_WORDS = 8  # shorter than this is a search term, a label or a form value
+
+
+def typed_text(tool_input):
+    """Prose typed through a browser tool: `type` actions, form values, and batched actions."""
+    out = []
+
+    def take(inp):
+        if not isinstance(inp, dict):
+            return
+        cands = []
+        if inp.get("action") == "type" and isinstance(inp.get("text"), str):
+            cands.append(inp["text"])
+        if isinstance(inp.get("value"), str):
+            cands.append(inp["value"])
+        for c in cands:
+            if len(c.split()) >= TYPED_MIN_WORDS and not re.match(r"^\s*https?://\S+\s*$", c):
+                out.append(c)
+        for act in inp.get("actions") or []:
+            if isinstance(act, dict):
+                take(act.get("input"))
+
+    take(tool_input)
+    return "\n".join(out)
+
+
+def classify_send(tool_name, tool_input):
+    """Return 'chat', 'prose', or None for a send/draft/comment tool."""
+    if not tool_name.startswith("mcp__"):
+        return None
+    name = tool_name.lower()
+    short = _short_tool_name(tool_name).lower()
+
+    # Text typed into a page through a browser tool (Google Slides, Docs, a web form). It never
+    # passes a file write or a send tool, so slide copy reached him unchecked.
+    if any(h in name for h in BROWSER_NAME_HINTS):
+        return "typed" if typed_text(tool_input) else None
+
+    # Chat apps first: match the server segment, since send_message is shared with email.
+    if any(h in name for h in CHAT_NAME_HINTS):
+        if any(v in short for v in ("send", "reply", "message", "forum", "post")):
+            return "chat"
+        return None
+
+    # Email: by name, or by a mail-shaped payload (covers opaque-hash connectors).
+    email_shape = any(k in tool_input for k in EMAIL_SHAPE_KEYS) or (
+        ("to" in tool_input) and any(b in tool_input for b in ("body", "htmlBody", "message")))
+    if any(h in name for h in EMAIL_NAME_HINTS) or email_shape:
+        if any(v in short for v in ("send", "draft", "reply", "forward", "mail", "message")):
+            return "prose"
+        return None
+
+    # Tickets / wiki: issue bodies and comments.
+    if any(h in name for h in TICKET_NAME_HINTS):
+        if any(v in short for v in ("comment", "create", "update", "page", "issue", "task")):
+            return "prose"
+        return None
+
+    return None
+
+
+def _flatten_text(node):
+    """Best-effort plain text from an ADF-like nested body (Atlassian, etc.)."""
+    out = []
+    if isinstance(node, dict):
+        if isinstance(node.get("text"), str):
+            out.append(node["text"])
+        for v in node.values():
+            if isinstance(v, (dict, list)):
+                out.append(_flatten_text(v))
+    elif isinstance(node, list):
+        for item in node:
+            out.append(_flatten_text(item))
+    return " ".join(t for t in out if t)
+
+
+def extract_send_body(tool_input, include_subject=False):
+    """Pull the human-written body (plus subject for email) from a send payload."""
+    parts = []
+    if include_subject:
+        for k in SUBJECT_KEYS:
+            v = tool_input.get(k)
+            if isinstance(v, str) and v.strip():
+                parts.append(v)
+                break
+    for k in BODY_KEYS:
+        v = tool_input.get(k)
+        if isinstance(v, str) and v.strip():
+            parts.append(v)
+            break
+        if isinstance(v, (dict, list)) and v:
+            flat = _flatten_text(v)
+            if flat.strip():
+                parts.append(flat)
+            break
+    return "\n".join(p for p in parts if p).strip()
+
+
+# His named hard-ban words (global CLAUDE.md). They are density-flagged elsewhere, which
+# never trips on a short send, so on the send path they block on the first occurrence.
+SEND_HARD_BAN = ("comprehensive", "robust", "detailed", "cutting-edge", "cutting edge",
+                 "innovative", "synergy", "whack-a-mole", "whack a mole")
+
+
+def check_hard_ban(body):
+    out = []
+    low = body.lower()
+    for w in SEND_HARD_BAN:
+        if re.search(r"(?<![\w-])" + re.escape(w) + r"(?![\w-])", low):
+            out.append((0, f"[BLOCK] banned word: '{w}' - write the plain noun instead"))
+    return out
+
+
+def run_send_checks(body, mode):
+    """mode 'chat' or 'typed' -> tells only; 'prose' -> full set. Returns list of (line, msg)."""
+    emdash = []
+    if EM_DASH in body:
+        emdash = [(0, f"[BLOCK] em dash present ({body.count(EM_DASH)}x) - banned outright; use a hyphen, comma, or period")]
+    if mode in ("chat", "typed"):
+        return (check_hard_ban(body) + check_banned_phrases(body) + check_curly_quotes(body)
+                + check_middot_separator(body) + emdash)
+    blocks = (check_hard_ban(body) + check_banned_phrases(body) + check_curly_quotes(body)
+              + check_title_case_headings(body) + check_bold_overuse(body)
+              + check_bold_lead_paragraph(body) + check_middot_separator(body)
+              + check_explainer_headings(body) + check_restatement(body)
+              + check_structural_tics(body) + check_emoji_bullets(body)
+              + check_uniform_sentences(body) + check_label_every_block(body)
+              + check_stacked_short_sentences(body) + check_landing_closer(body)
+              + check_weak_phrases(body) + emdash)
+    blocks += [(0, w) for w in check_word_density(body)]
+    blocks += [(w[0], w[1]) if isinstance(w, tuple) else (0, w) for w in check_filler_transitions(body)]
+    return blocks
+
+
+def main():
+    if os.environ.get("DISABLE_ANTI_SLOP_HOOK", "0") == "1":
+        sys.exit(0)
+
+    try:
+        raw_input = sys.stdin.read()
+        input_data = json.loads(raw_input)
+    except (json.JSONDecodeError, ValueError):
+        sys.exit(0)
+
+    tool_name = input_data.get("tool_name", "")
+    tool_input = input_data.get("tool_input", {})
+
+    # Send / draft / comment surfaces (email, tickets, chat) never hit a file path, so the
+    # file checks below never see them. Gate them here before the Write/Edit early-exit.
+    send_mode = classify_send(tool_name, tool_input)
+    if send_mode:
+        body = (typed_text(tool_input) if send_mode == "typed"
+                else extract_send_body(tool_input, include_subject=(send_mode == "prose")))
+        if not body.strip():
+            sys.exit(0)
+        blocks = run_send_checks(body, send_mode)
+        if blocks:
+            label = _short_tool_name(tool_name)
+            parts = [f"AI Slop BLOCKED: {len(blocks)} pattern(s) in {label} ({send_mode} send):\n"]
+            for _line_num, msg in blocks[:8]:
+                parts.append(f"  {msg}")
+            if len(blocks) > 8:
+                parts.append(f"\n  ... and {len(blocks) - 8} more.")
+            parts.append("\nRewrite without these AI patterns before it sends. Then match his voice: "
+                         "sample his last sends in this channel and mirror their shape.")
+            print("\n".join(parts), file=sys.stderr)
+            sys.exit(2)
+        sys.exit(0)
+
+    if tool_name not in ["Edit", "Write", "MultiEdit"]:
+        sys.exit(0)
+
+    file_path = tool_input.get("file_path", "")
+
+    # Determine what to check
+    content = extract_content(tool_name, tool_input)
+    if not content:
+        sys.exit(0)
+
+    # For source files, only check string literals. Interface narration is the exception:
+    # in JSX and templates the visible text sits outside quotes, so it reads the raw source.
+    narration = []
+    if is_source_file(file_path):
+        narration = check_interface_narration(content)
+        content = extract_string_literals(content)
+        if not content and not narration:
+            sys.exit(0)
+    elif not is_prose_file(file_path):
+        sys.exit(0)
+    else:
+        narration = check_interface_narration(content)
+
+    # HTML entities hide slop from the character-based checks: &mdash; (and &#8212; / &#x2014;)
+    # is an em dash, &middot; a middot, &rsquo; a curly quote. Decode them so encoded slop
+    # blocks exactly like a literal character would. (2026-08-28: a deck slipped em dashes as
+    # &mdash; past this gate because the scan only saw the literal codepoint.)
+    if is_prose_file(file_path) and os.path.splitext(file_path)[1].lower() in {".html", ".htm"}:
+        content = html.unescape(content)
+
+    # Run checks
+    banned = check_banned_phrases(content)
+    curly = check_curly_quotes(content)
+    titlecase = check_title_case_headings(content)
+    bold = check_bold_overuse(content)
+    boldlead = check_bold_lead_paragraph(content)
+    middot = check_middot_separator(content)
+    explainer = check_explainer_headings(content)
+    restate = check_restatement(content)
+    tics = (check_structural_tics(content) + check_emoji_bullets(content)
+            + check_uniform_sentences(content) + check_label_every_block(content)
+            + check_stacked_short_sentences(content) + check_landing_closer(content))
+    # Everything blocks; there is no warn tier. Density, filler transitions, weak copulas,
+    # -ing tails, wordy phrases and false ranges all block. Em dashes block on any occurrence.
+    # Paragraph-length uniformity is deliberately not checked: it false-positives on every
+    # structured document.
+    density_blocks = [(0, w) for w in check_word_density(content)]
+    filler_blocks = [(w[0], w[1]) if isinstance(w, tuple) else (0, w) for w in check_filler_transitions(content)]
+    weak_blocks = check_weak_phrases(content)
+    emdash_blocks = []
+    if EM_DASH in content:
+        emdash_blocks = [(0, f"[BLOCK] em dash present ({content.count(EM_DASH)}x) - banned outright; use a hyphen, comma, or period")]
+
+    all_blocks = (banned + curly + titlecase + bold + boldlead + middot + explainer + narration
+                  + restate + tics + weak_blocks + density_blocks + emdash_blocks + filler_blocks)
+
+    if all_blocks:
+        parts = [f"AI Slop BLOCKED: {len(all_blocks)} pattern(s) in {os.path.basename(file_path)}:\n"]
+        for line_num, msg in all_blocks[:8]:
+            parts.append(f"  Line ~{line_num}: {msg}")
+        if len(all_blocks) > 8:
+            parts.append(f"\n  ... and {len(all_blocks) - 8} more.")
+        parts.append(f"\nRewrite without these AI patterns. See: {os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'references', 'copy-slop-dictionary.md')}")
+        print("\n".join(parts), file=sys.stderr)
+        sys.exit(2)
+
+    sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()
