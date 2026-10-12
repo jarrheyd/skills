@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.2.0
+
+### Minor Changes
+
+- [`926b522`](https://github.com/jarrheyd/skills/commit/926b52216dadb36ddb68482c1df83a8b5a5a1dac) Thanks [@jarrheyd](https://github.com/jarrheyd)! - deslop: the copy hook now checks prose typed into a page through a browser tool (a `type` action, a form value, or a batched action), so slide and doc copy entered through Chrome is gated like a file write. Text under eight words and bare links pass.
+
+- [`926b522`](https://github.com/jarrheyd/skills/commit/926b52216dadb36ddb68482c1df83a8b5a5a1dac) Thanks [@jarrheyd](https://github.com/jarrheyd)! - deslop: the copy hook now blocks interface copy that explains itself (a line that tells the reader to click here, that says what a page shows, or a sign-in subtitle listing what is behind it), reading raw JSX text as well as string literals. The review gate and the slop-detector agent gain an interface pass: delete every subtitle, helper line and caption a first-time user can do without.
+
+- [`926b522`](https://github.com/jarrheyd/skills/commit/926b52216dadb36ddb68482c1df83a8b5a5a1dac) Thanks [@jarrheyd](https://github.com/jarrheyd)! - deslop: the copy hook now blocks a bold line used as a section label on three or more blocks, three short sentences in a row of about the same length, and a paragraph that ends on a short abstract closing line.
+
+- [`926b522`](https://github.com/jarrheyd/skills/commit/926b52216dadb36ddb68482c1df83a8b5a5a1dac) Thanks [@jarrheyd](https://github.com/jarrheyd)! - qa-review: a web repo can set `"runner": "playwright"`. The runner then calls the repo's Playwright suite instead of Maestro, and `scripts/playwright-reporter.mjs` files one result per spec plus the screenshots so the same report builds from it. Config and manifest can sit at the repo root.
+
+- [`926b522`](https://github.com/jarrheyd/skills/commit/926b52216dadb36ddb68482c1df83a8b5a5a1dac) Thanks [@jarrheyd](https://github.com/jarrheyd)! - retro: new skill. It harvests the moments in Claude session transcripts where the person corrected the agent, repeated themselves, interrupted, or a tool kept failing, then applies a fix to the setup for each one with a backup and a log line.
+
 ## 2.1.0
 
 ### Minor Changes
