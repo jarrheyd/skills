@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.2.1
+
+### Patch Changes
+
+- [`7816c0c`](https://github.com/jarrheyd/skills/commit/7816c0c20c45673205dab34830c692ab3d523355) Thanks [@jarrheyd](https://github.com/jarrheyd)! - deslop: the copy hook and slop dictionary catch more tells. retro: harvest reads his replies typed in the valley messenger and works when run through the skills symlink.
+
 ## 2.2.0
 
 ### Minor Changes
