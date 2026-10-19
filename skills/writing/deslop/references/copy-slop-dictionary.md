@@ -435,3 +435,68 @@ Instead: join two of them and trail the reason on "since", "so" or "because". "T
 A paragraph that ends on a short abstract sentence carrying no number and no proper noun, following a sentence at least twice its length. It exists to sound final rather than to say anything. "Treat release day as a non-event." "That is the point."
 
 Instead: delete it, or replace it with the fact it was gesturing at.
+
+## Over-explaining the obvious (added 2026-10-12)
+His words: "i dont like words that overexplain ever. this is easily assumed. these overexplanations are such an AI tell."
+Disclaimers and captions that tell the reader what the context already says: "Made up for today. Not an ML plan.", "What you saw today", "When ML runs it for real", "for demo purposes", "as you can see", "not production code". Cut the line. If context is truly missing, show it with a visual, never a caption. The hook blocks the common forms; the review gate catches the rest by asking of every line: would he assume this anyway?
+
+## Cases he flagged: over-explanation (mined 2026-10-13)
+
+Mined from his own pushback in Claude Code transcripts (July to October 2026), the voice-learning log and memory notes. Client detail stripped. Where his fix is known, it follows the arrow. Use these as the bar: if a line looks like one of these, delete it.
+
+### Reassurance, disclaimers and demo notes in UI
+- 2026-10-13. A dashed "Demo: a sample flow. No money moves and no order reaches the bank." box on an app screen. -> Deleted. At most one quiet "Sample data" marker per app.
+- 2026-10-13. An internal app: a greeting, a welcome, then a paragraph under it; a reassurance line ("a gap is something to talk about, never a penalty") he called corny. -> No greeting paragraph, no reassurance. "Show, not tell."
+- 2026-10-12. Deck disclaimers "Made up for today. Not an X plan." and a "What you saw today" caption. -> Cut. "This is easily assumed."
+- 2026-08-16. A family app telling the user what will happen later ("you will both get a circle of your own when they respond") and listing media limits up front. -> Information shows up just in time, at the moment it matters.
+- 2026-08-21. App copy that narrates a feeling ("kept somewhere that makes it feel longer"). -> Deleted.
+
+### Subtitles, helper lines and labels that restate
+- 2026-10-08. A wealth app with a subtitle under every heading, "Sign in to see your portfolio", and "You need your username and invitation code" above fields with those labels. -> Labels only.
+- 2026-10-11. A Q&A page with an answer line under every question. -> Questions only.
+- 2026-10-13. A profile field labelled with a full sentence about writing your line. -> "Bio". Tap the text to edit; no separate view and edit buttons.
+- 2026-10-12. An app home with too much info, including figures nobody needs at a glance. -> Removed.
+- 2026-10-01. A travel app page with text action buttons and wordy cards. -> Every action button is an icon. Fewer words.
+- 2026-08-14. Booking-app error text explaining the whole discount policy. -> "Minors and infants must travel with an adult." Brief but directional.
+
+### Internal or presenter text leaking into client-facing work
+- 2026-08-17. A user-facing journeys page opening with how the team tests each release, and screenshots showing a debugger banner. -> FAQ frames ("How to join") and clean screenshots.
+- 2026-08-17. Internal phrasing ("the best product in the group") in a client deck. -> Cut. Keep the goal implicit.
+- 2026-08-17. A payments deck using an internal system name the reader never sees. -> Lay terms, the name the reader knows.
+- 2026-10-11. A theory page explaining that the firm does not work for free and mentioning an internal debate. -> Cut both. Visual, less text.
+- 2026-10-02. Story lines narrating the team's feelings and promising work "being written now". -> Cut.
+
+### Captions, explainer headers and slide furniture
+- 2026-08-27. A slide footer re-explaining the slide, and a slide he could say aloud. -> He removed the bottom line himself and cut the slide. "I just need visuals."
+- 2026-08-27. A dash at the top of slides, a header that explains the slide, a footer that explains it again. -> None of the three.
+- 2026-09-01. Doc headings like "The system, in two pictures". -> "The system".
+- 2026-09-04. A diagram brief with design notes and callouts inside the visual. -> Notes go in a message to the designer, not in the visual.
+- 2026-07-23. A status deck repeating last meeting's info. -> High level; the rest is said aloud.
+- 2026-10-11. A page of labelled boxes with captions that repeat the same point. -> Drawings, captions of a few words.
+- 2026-10-05. A data flow diagram that was mostly text. -> A diagram, few words.
+
+### Document preambles
+- 2026-10-10. An options doc opening "X asked us to prepare Y. Before we build it, here are 5 ways to do it." -> Start at the options.
+- 2026-07-28. A release update written like a requirements doc. -> Release-note lines showing the value.
+- 2026-09-03. A status doc with long items. -> Short items, done first, grouped by feature.
+
+### Rationale and reasoning in drafts as him
+- 2026-08-06. A 6-line WhatsApp draft explaining reasoning before the answer. -> "up to us on this one. We can default to opted out, and they can opt in."
+- 2026-08-12. A long technical chat draft. -> "IIRC - all-traffic was turned on so AI summary API worked. if we go back to private-ranges-only, would it still work?"
+- 2026-08-17. A yes with a caveat attached. -> "yes okay ra".
+- 2026-08-19. A ticket review draft that asked for extra testing and explained each point. -> "looks okay", comment only on the one open point.
+- 2026-10-04. A billing reply opening by clearing the firm and guessing the cause. -> Only the ask: "can you check admin console > billing > payment accounts?" "Dont restate the obvious."
+- 2026-08-11. A client email spelling out where a budget figure came from. -> Say the budget exists; skip the origin.
+- 2026-09-26. A bug summary listing everything found proactively. -> Her reports and why; one line for the rest.
+- 2026-09-28. "Will not roll over" in a proposal. -> Reads defensive; rephrase or drop.
+- 2026-10-06. A project-channel nudge "too long to read". -> One short send.
+- 2026-07-22. A client recap email, formal and wordy. -> "Even the NDA thing could just be one sentence."
+
+### Jargon that then needs explaining
+- 2026-08-17. Automated ticket comments "cryptic, theoretical, too wordy". -> Plain words, one idea per sentence.
+- 2026-08-19. Questions for legal "so wordy and hard to understand". -> One plain question each.
+- 2026-08-14. Product description copy "cryptic and marketing-y". -> Objective and straightforward.
+
+### Reports to him
+- 2026-10-01 and 2026-10-02. "your responses are so wordy", "your drafts are always so long". -> Outcome first, one line per point.
+- 2026-08-17. A plan "toooooo wordy". -> Half the words, every point.

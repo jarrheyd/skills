@@ -17,6 +17,8 @@ def run(content, path="draft.md", tool="Write"):
 
 
 BLOCKS = [
+    ("ease tag once", "Sign in with your app password, once."),
+    ("ease tag straight in", "Your account is linked, straight in."),
     ("fast-paced opener", "In today's fast-paced world we ship."),
     ("not-just reframe", "It's not just a tool. It's a revolution."),
     ("unlock", "Unlock the power of skills."),
@@ -135,6 +137,10 @@ class CopyHook(unittest.TestCase):
         code, err = run("export const A = () => <p>Click here to view your statements</p>;\n", path="a.tsx")
         self.assertEqual(code, 2, err)
         self.assertIn("interface narration", err)
+
+    def test_once_in_a_real_sentence_passes(self):
+        for text in ("We met once, in March.", "Run it once a day.", "Pay once and keep it."):
+            self.assertEqual(run(text)[0], 0, text)
 
     def test_plain_labels_pass(self):
         for text in ("View statements", "Sign in", "Set up your passkey", "Wrong code. 2 tries left."):

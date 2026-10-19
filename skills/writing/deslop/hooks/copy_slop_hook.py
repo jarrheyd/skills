@@ -266,6 +266,10 @@ EXPLAINER_HEADINGS = [
 # functional) lives in references/copy-slop-dictionary.md for the review.
 # ============================================================
 INTERFACE_NARRATION = [
+    # A clipped tag after a comma that sells ease: "your password, once", "linked, straight
+    # in", "set up, no fuss". He flagged these as AI tells (a client copy review and a retro, October).
+    (r"(?i),\s*(?:once|straight in|no fuss|just like that|in one go|in seconds|done and done|no hassle)\s*[.!]?\s*(?:$|[\"'<])",
+     "clipped ease tag after a comma (', once' / ', straight in'): say the plain fact or cut it"),
     (r"(?i)\b(?:click|tap|press)\s+(?:here|below|the\s+(?:button|link)(?:\s+below)?)\s+to\b",
      "interface narration: 'click here to' - name the action on the control and drop the sentence"),
     (r"(?i)\bhere\s+you(?:\s+can|\s+will|'ll)\s+(?:find|see|view|manage|access)\b",
@@ -364,15 +368,129 @@ def is_source_file(file_path):
     return ext in SOURCE_EXTENSIONS
 
 
-def extract_string_literals(content):
-    """Extract string literals from source code for slop checking."""
-    strings = []
-    # Match quoted strings (both single and double), handling escapes
-    for match in re.finditer(r'(?:"([^"\\]*(?:\\.[^"\\]*)*)"|\'([^\'\\]*(?:\\.[^\'\\]*)*)\')', content):
-        s = match.group(1) or match.group(2)
-        if s and len(s) > 20:  # only check non-trivial strings
-            strings.append(s)
-    return "\n".join(strings)
+C_LIKE = {".tsx", ".jsx", ".ts", ".js", ".mjs", ".cjs", ".swift", ".kt", ".dart", ".go", ".vue", ".svelte"}
+
+
+def _regex_starts(content, i):
+    """Does the / at i open a regex literal? It does after an operator, an opening bracket, a
+    comma, the start of the text, or a keyword like return; after a name or a ) it divides."""
+    j = i - 1
+    while j >= 0 and content[j] in " \t":
+        j -= 1
+    if j < 0 or content[j] in "(,=:[!&|?{};+-*%<>~^\n":
+        return True
+    m = re.search(r"(\w+)$", content[:j + 1])
+    return bool(m) and m.group(1) in ("return", "typeof", "case", "do", "else", "in", "of", "void", "yield", "await")
+
+
+def _strip_c_comments(content):
+    """C-like source with every comment blanked out, line breaks kept, so a raw-source check
+    (interface narration) still sees JSX text and strings but never a code comment."""
+    spans = []
+    _scan_c_like(content, spans)
+    chars = list(content)
+    for x, y in spans:
+        for k in range(x, min(y, len(chars))):
+            if chars[k] != "\n":
+                chars[k] = " "
+    return "".join(chars)
+
+
+def _scan_c_like(content, comments=None):
+    """The text pieces of C-like source a person could read: quoted strings and the text parts
+    of template literals. Comments and code are skipped, so an apostrophe in a comment never
+    opens a string, and a quoted string never runs past the end of its line."""
+    out, i, n = [], 0, len(content)
+    stack = []  # brace depth of each open ${ ... } inside a template literal
+    while i < n:
+        c = content[i]
+        if c == "/" and content.startswith("//", i):
+            j = content.find("\n", i)
+            j = n if j < 0 else j
+            if comments is not None:
+                comments.append((i, j))
+            i = j
+        elif c == "/" and content.startswith("/*", i):
+            j = content.find("*/", i + 2)
+            j = n if j < 0 else j + 2
+            if comments is not None:
+                comments.append((i, j))
+            i = j
+        elif c == "/" and _regex_starts(content, i):
+            # a regex literal: skipped whole, so a quote or backtick inside it opens nothing
+            j, cls = i + 1, False
+            while j < n and content[j] != "\n" and (cls or content[j] != "/"):
+                if content[j] == "\\":
+                    j += 1
+                elif content[j] == "[":
+                    cls = True
+                elif content[j] == "]":
+                    cls = False
+                j += 1
+            i = j + 1
+        elif c in "'\"":
+            j, buf = i + 1, []
+            while j < n and content[j] != c and content[j] != "\n":
+                if content[j] == "\\" and j + 1 < n:
+                    buf.append(content[j:j + 2]); j += 2
+                    continue
+                buf.append(content[j]); j += 1
+            if j < n and content[j] == c:
+                out.append("".join(buf))
+            i = j + 1
+        elif c == "`" or (c == "}" and stack and stack[-1] == 0):
+            # template text, up to the closing backtick or the next ${
+            if c == "}":
+                stack.pop()
+            j, buf = i + 1, []
+            while j < n and content[j] != "`" and not content.startswith("${", j):
+                if content[j] == "\\" and j + 1 < n:
+                    buf.append(content[j:j + 2]); j += 2
+                    continue
+                buf.append(content[j]); j += 1
+            out.append("".join(buf))
+            if content.startswith("${", j):
+                stack.append(0)
+                i = j + 2
+            else:
+                i = j + 1
+        else:
+            if stack and c == "{":
+                stack[-1] += 1
+            elif stack and c == "}":
+                stack[-1] -= 1
+            i += 1
+    return out
+
+
+def extract_string_literals(content, file_path=""):
+    """The strings in source code that people read, for slop checking. A string with no space
+    (a key, a dotted path, a class name) is code, not copy. Each string is its own paragraph,
+    so neighbouring labels never read as one run of short sentences."""
+    if os.path.splitext(file_path or "")[1].lower() in C_LIKE:
+        found = _scan_c_like(content)
+    else:
+        found = [m.group(1) if m.group(1) is not None else m.group(2) for m in re.finditer(
+            r'(?:"([^"\\\n]*(?:\\.[^"\\\n]*)*)"|\'([^\'\\\n]*(?:\\.[^\'\\\n]*)*)\')', content)]
+    strings = [s for s in found if s and len(s) > 20 and " " in s.strip()]
+    return "\n\n".join(strings)
+
+
+# BLOCKING: over-explaining the obvious (added 2026-10-12, his words: "i dont like words
+# that overexplain ever. this is easily assumed. these overexplanations are such an AI tell").
+# Disclaimers and labels that tell the reader what they already know: "Made up for today.
+# Not an ML plan.", "What you saw today", "for illustration only", "as you can see".
+# Cut the line. If context really is missing, show it, do not caption it.
+BANNED_PHRASES += [
+    (r"(?i)\bmade[- ]up for (?:today|this|the)\b", "over-explaining: 'made up for today' -- the room already knows, cut it"),
+    (r"(?i)\bnot an? (?:real |actual )?[A-Z]?\w*\s*(?:plan|product|customer|company)\b\.?$", "over-explaining disclaimer: 'Not an X plan' -- cut it"),
+    (r"(?i)\b(?:this is|it'?s|it is) (?:just|only) an? (?:example|exercise|demo|illustration|sample)\b", "over-explaining: 'this is just an example' -- cut it"),
+    (r"(?i)\bfor (?:illustration|illustrative|demo|demonstration) purposes(?: only)?\b", "over-explaining: 'for demo purposes' -- cut it"),
+    (r"(?i)\bwhat you (?:saw|see|will see|just saw) (?:today|here|earlier)\b", "over-explaining label: 'what you saw today' -- the slide shows it, cut the caption"),
+    (r"(?i)\bas you can see\b", "over-explaining: 'as you can see' -- cut it"),
+    (r"(?i)\bnot (?:production|real|actual) (?:code|data)\b", "over-explaining: 'not production code' -- assumed, cut it"),
+    (r"(?i)\b(?:keep in mind|it'?s worth noting|note) that\b", "over-explaining: 'keep in mind that' -- state the fact or cut it"),
+]
 
 
 def check_banned_phrases(content):
@@ -743,6 +861,60 @@ def check_explainer_headings(content):
     return violations
 
 
+# BLOCKING: demo reassurance in UI files (added 2026-10-13). His words: "i dont like it when we
+# overexplain anywhere even for things like this... that demo box is not necessary." A demo
+# screen that tells the viewer nothing is real is reassurance nobody needs. Demo scaffolding
+# belongs only where the viewer would be stuck (a code to type); one quiet marker per app.
+# Read on the raw source of UI files only, since JSX text sits outside quotes. Narrow by
+# design: every shape here is a sentence a shipped product never shows.
+DEMO_UI_EXTENSIONS = {".tsx", ".jsx", ".ts", ".js", ".mjs", ".vue", ".svelte", ".html", ".htm"}
+DEMO_REASSURANCE = [
+    (r"(?i)\bno\s+(?:real\s+)?money\s+(?:moves|is\s+moved|changes\s+hands|leaves)\b",
+     "demo reassurance: the 'no money' line - the viewer knows it is a demo; delete it"),
+    (r"(?i)\bnothing\s+you\s+(?:enter|type|submit|fill\s+in|do\s+here)\s+(?:is|gets|will\s+be)\s+(?:sent|saved|stored|submitted|shared|real|kept)\b",
+     "demo reassurance: the 'nothing you enter' line - delete it"),
+    (r"(?i)\bno\s+(?:order|payment|request|transaction|instruction)s?\s+(?:reaches|is\s+sent\s+to|goes\s+to|will\s+reach)\b",
+     "demo reassurance: the 'no order reaches' line - delete it"),
+    (r"(?i)\bthis\s+is\s+(?:a|an|just\s+a|only\s+a)\s+(?:sample|demo|simulated|mock)\s+(?:flow|journey|screen|page|app|account|order|transaction|portfolio)\b",
+     "demo reassurance: the 'this is a sample flow' line - delete it; one quiet marker per app at most"),
+    (r"(?i)(?:>|[\"'`])\s*demo\s*:\s*\w",
+     "demo note: a visible 'Demo:' box - delete it; scaffolding only where the viewer would be stuck"),
+    (r"(?i)(?:>|[\"'`])\s*demo\s+controls?\b",
+     "demo note: a visible demo-controls label - presenter text in the product; hide it or drop the label"),
+    (r"(?i)\bnot\s+(?:a\s+)?real\s+(?:money|order|transaction|payment|trade|purchase)s?\b",
+     "demo reassurance: the 'not real' line - delete it"),
+    (r"(?i)\bnothing\s+(?:is|gets|will\s+be)\s+(?:debited|charged|transferred|invested)\b",
+     "demo reassurance: the 'nothing is debited' line - delete it"),
+    (r"(?i)(?:>|[\"'`])\s*(?:a\s+)?(?:sample|demo|simulated|mock)\s+(?:flow|journey)\b",
+     "demo note: a visible 'sample flow' line - delete it"),
+    (r"<Demo(?:Note|Banner|Box|Notice|Disclaimer|Callout)\b",
+     "demo note component on a screen - one quiet marker per app at most, never a box per screen"),
+]
+
+
+# Tests assert the UI text, build output repeats it, and API docs (Swagger summaries) are for
+# developers, not viewers. None of them is a screen, so none of them blocks.
+DEMO_SKIP_PATH = re.compile(r"(?i)(?:\.(?:spec|test)\.[jt]sx?$|/(?:e2e|tests?|__tests__|\.next[^/]*|dist|build)/)")
+DEMO_SKIP_LINE = re.compile(r"(?i)(?:@Api\w*|\b(?:summary|operationId)\s*:)")
+
+
+def check_demo_reassurance(content, file_path):
+    """BLOCK: a demo screen reassuring the viewer that nothing is real."""
+    if os.path.splitext(file_path)[1].lower() not in DEMO_UI_EXTENSIONS:
+        return []
+    if DEMO_SKIP_PATH.search(file_path):
+        return []
+    violations = []
+    for i, line in enumerate(content.split("\n"), 1):
+        if DEMO_SKIP_LINE.search(line):
+            continue
+        for pattern, msg in DEMO_REASSURANCE:
+            if re.search(pattern, line):
+                violations.append((i, f"[BLOCK] {msg}"))
+                break
+    return violations
+
+
 def check_interface_narration(content):
     """BLOCK: a line that explains the interface or tells the reader how to use a control."""
     violations = []
@@ -1066,16 +1238,17 @@ def main():
 
     # For source files, only check string literals. Interface narration is the exception:
     # in JSX and templates the visible text sits outside quotes, so it reads the raw source.
-    narration = []
+    narration = check_demo_reassurance(content, file_path)
     if is_source_file(file_path):
-        narration = check_interface_narration(content)
-        content = extract_string_literals(content)
+        raw = _strip_c_comments(content) if os.path.splitext(file_path)[1].lower() in C_LIKE else content
+        narration += check_interface_narration(raw)
+        content = extract_string_literals(content, file_path)
         if not content and not narration:
             sys.exit(0)
     elif not is_prose_file(file_path):
         sys.exit(0)
     else:
-        narration = check_interface_narration(content)
+        narration += check_interface_narration(content)
 
     # HTML entities hide slop from the character-based checks: &mdash; (and &#8212; / &#x2014;)
     # is an em dash, &middot; a middot, &rsquo; a curly quote. Decode them so encoded slop
@@ -1112,10 +1285,13 @@ def main():
 
     if all_blocks:
         parts = [f"AI Slop BLOCKED: {len(all_blocks)} pattern(s) in {os.path.basename(file_path)}:\n"]
-        for line_num, msg in all_blocks[:8]:
+        # every finding at once, so one rewrite clears them all (retro 10-16: about 1,700 blocks a
+        # week, many of them second and third rounds on the same file)
+        for line_num, msg in all_blocks[:30]:
             parts.append(f"  Line ~{line_num}: {msg}")
-        if len(all_blocks) > 8:
-            parts.append(f"\n  ... and {len(all_blocks) - 8} more.")
+        if len(all_blocks) > 30:
+            parts.append(f"\n  ... and {len(all_blocks) - 30} more.")
+        parts.append("\nFix every line above in one pass, then write once. Resubmitting the same text is blocked again.")
         parts.append(f"\nRewrite without these AI patterns. See: {os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'references', 'copy-slop-dictionary.md')}")
         print("\n".join(parts), file=sys.stderr)
         sys.exit(2)

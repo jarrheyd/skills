@@ -40,6 +40,8 @@ Every pattern is a regex in `copy_slop_hook.py`; the literal list, with fixes, i
 - Typography: em dashes (including HTML entities), curly quotes, middot separators, Title Case headings, bold as decoration, a period-terminated bold fragment used as a paragraph title.
 - Explainer headings that gloss the artifact instead of naming the subject.
 - Interface narration: a line that says what a screen is for or how to press a control. In JSX and templates it reads the raw source, since visible text sits outside quotes.
+- Demo reassurance in UI files (JSX, TSX, HTML, Vue, Svelte): "No money moves", "Nothing you enter is sent", "No order reaches ...", "This is a sample flow", a visible "Demo:" note or "Demo controls" label.
+- Over-explaining the obvious in any file: the demo-purposes disclaimer, the just-an-example line, the as-you-can-see aside, the not-production-code note, the keep-in-mind preface.
 - Restatement: two adjacent sentences or bullets sharing 90 percent of their content words. Parallel lists with different values pass.
 - Hyphenated-compound titles, three adjectives in a row, and the law of threes (three one-word sentences, or a sentence that closes on three single-word items).
 - Hook-and-reveal rhythms: the elliptical setup (a two-word question as a drumroll, then the answer), the suspense-then-answer, the unneeded justifier before a point, the revelation hook (the thing nobody supposedly says), the big-reveal frame (what a thing supposedly is underneath), and overhype (claims of changing everything or starting a revolution).
@@ -74,7 +76,13 @@ Patterns caught by comparing AI drafts with what a person actually sent in the s
 15. Explainer furniture. A heading that glosses the artifact instead of naming the subject, and a footer caption that re-explains the slide above it.
 16. Unranked points in an argument. An inventory (a sweep, a ledger, a roll-up) is exhaustive and flat by design. A thesis document (memo, proposal, decision doc) that reads flat has not found its argument: surface the three points that carry the decision, demote the rest.
 
-17. An interface that explains itself. A subtitle under every heading, a helper line under every button, numbered steps for a two-tap flow, a caption restating the chart, a disclaimer nobody asked for. Apps people use daily carry almost none of it. Test each line: delete it, and if a first-time user can still do the task, it stays deleted. What survives is functional: labels, values, dates, errors that say what to do next, legal lines a regulator requires, and one short line before an action that cannot be undone.
+17. An interface that explains itself. A subtitle under every heading, a greeting plus a welcome paragraph, a helper line under every button, numbered steps for a two-tap flow, a caption restating the chart, a disclaimer nobody asked for, a dashed note box telling the viewer what the screen is. Apps people use daily carry almost none of it. Show, do not tell. Run the deletion test in tell 18 on every visible string.
+
+18. Over-explanation, anywhere. His most repeated correction (42 flagged cases, July to October 2026, listed in `references/copy-slop-dictionary.md` under "Cases he flagged"). It shows up as: reassurance and disclaimers in UI, subtitles and helper lines, rationale riders on approvals, the reasoning written into a chat or a report, captions restating a visual, step lists for trivial flows, labels restating the title, internal or presenter text leaking into client-facing screens, jargon that then needs a gloss, and a preamble saying who asked for the doc or what it covers.
+   - The deletion test: delete the line. If the reader still understands, still decides, or still finishes the task, it stays deleted. Apply it to every visible string and every sentence, not only the ones that look like filler.
+   - What survives: labels, values, units, dates and "as of" stamps, errors that say what to do next, legal lines a regulator requires, and one short line before an action that cannot be undone. In a draft, the decision or the ask, and nothing that explains why unless he asked why.
+   - Demos: scaffolding appears only where a viewer would otherwise be stuck (a code they must type, a password they must use). Never as reassurance. "No money moves", "Nothing you enter is sent", "This is a sample flow" all go. One demo marker per app at most, such as a quiet "Sample data" in the footer, never a box per screen.
+   - Drafts as him: a yes is the bare yes. No line clearing the company, no theory of the cause, no mention of what the reader can already see in the attachment or the thread.
 
 ## Review gate after every implementation
 
@@ -83,7 +91,7 @@ Before presenting a feature, a document, a design, copy, or UI:
 1. Sweep the user-facing surfaces: copy, docs, UI choices, generated designs, commit-adjacent prose.
 2. Apply the five questions below, the tells above, and the relevant reference file.
 3. Cut to roughly half the words while keeping every point, silently. Present only the cut version; never show a before-and-after or mention the cut.
-4. Any UI: read every visible string on every screen and delete the ones that explain, instruct, or reassure. See tell 17 and the interface-copy section of `references/copy-slop-dictionary.md`.
+4. Any UI: read every visible string on every screen and delete the ones that explain, instruct, reassure or justify, demo notes included. See tells 17 and 18 and the interface-copy section of `references/copy-slop-dictionary.md`.
 5. Client-facing, published, or written in someone's voice: run the slop-detector agent.
 6. Fix what it finds, then present. Never present with a "might be sloppy" caveat.
 

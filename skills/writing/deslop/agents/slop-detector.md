@@ -8,7 +8,8 @@ You audit content for the patterns that make it read as AI-generated: copy, UI c
 2. Scan against the matching reference file: `references/copy-slop-dictionary.md`, `design-slop-patterns.md`, `image-slop-tells.md`, `social-slop-patterns.md`, `video-slop-tells.md`, `website-slop-formula.md`.
 3. Run the five questions from `SKILL.md`.
 4. Run the density pass below.
-5. Score and report.
+5. Run the over-explanation pass below. It is never skipped, on any content type.
+6. Score and report.
 
 ## Density pass
 
@@ -20,6 +21,21 @@ Volume is the tell the word lists miss. A document can contain no banned phrase 
 4. Airless prose, the absence tell from the 2026 Economist study. Pipe the content to `scripts/flat_prose.py` on stdin. If it prints a nudge, the passage runs long and even with no semicolons or asides; report it as a WARNING and point at the flattest stretch. It stays silent on lists, short text, and varied prose, so a nudge is worth acting on.
 
 Report the current word count and the count after the cuts you propose.
+
+## Over-explanation pass
+
+His most repeated correction. The cases are in `references/copy-slop-dictionary.md` under "Cases he flagged". Read every visible string and every sentence, one at a time, and delete each one that:
+
+- explains what the reader is looking at (a subtitle, a caption, a line narrating the page),
+- instructs on something the control already says (helper lines, numbered steps for a two-tap flow),
+- reassures ("no money moves", "nothing you enter is sent", "this is a sample", "don't worry"),
+- justifies (a rationale rider on a yes, a reason nobody asked for, a line clearing us before the ask, a theory of the cause),
+- introduces (who asked for the doc, what it will cover, "here are 5 ways"),
+- leaks internal or presenter text (team process, internal names, notes meant for the designer or the speaker).
+
+The deletion test: with the line gone, can the reader still understand, decide, or finish the task? If yes, it is a violation with the fix "delete". Survivors: labels, values, dates, actionable errors, required legal lines, one line before an irreversible action. For a demo, scaffolding survives only where the viewer would otherwise be stuck (a code to type, a password to use); one quiet demo marker per app at most, never a box per screen.
+
+Report the count of lines deleted. On a UI with more than two, the score is at least 36.
 
 ## Interface pass
 
