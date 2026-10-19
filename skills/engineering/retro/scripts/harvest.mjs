@@ -23,6 +23,8 @@ const DROP_PREFIXES = [
   'Continue from where you left off', 'Caveat: The messages below', '<user-prompt-submit-hook',
   '<recommended_plugins', '<turn_aborted',
 ];
+// valley briefs and relays that reach a chat through the office plugin (not his words)
+const VALLEY_MACHINE = /^(From Jarrhey's mission control|Reply with the single word|\[from |From the EA brief|Helper chat "|You take over from|You were moved to|Jarrhey moved you to|Jarrhey says close this chat|Still late after|Due within|LATE:|\/[\w:-]+(\s|$))/;
 const OS_PREFIXES = ['<scheduled-task', '[SCHEDULED TASK', '<automation', '(Re-invocation of', 'Another Claude session sent a message'];
 const STRIP_BLOCKS = [
   /<system-reminder>[\s\S]*?<\/system-reminder>/g,
@@ -105,7 +107,10 @@ export function harvestRecords(records, meta = {}) {
     if (OS_PREFIXES.some((p) => head.startsWith(p))) continue;
     // Newer transcripts say who spoke; trust that over prefixes when it is there.
     const origin = d.origin && d.origin.kind;
-    if (origin && origin !== 'human') continue;
+    // His replies typed in the valley messenger arrive through the office plugin as his own
+    // turn (asUser); the valley's machine briefs take the same road, so they drop by prefix.
+    const fromValley = origin === 'plugin' && d.origin.name === 'office' && d.origin.asUser && !VALLEY_MACHINE.test(head);
+    if (origin && origin !== 'human' && !fromValley) continue;
     if (!origin && (d.promptSource === 'system' || d.promptSource === 'sdk') && 'origin' in d) continue;
 
     const text = clean(raw);
@@ -257,6 +262,8 @@ async function main(argv) {
   for (const [k, v] of Object.entries(counts).sort((x, y) => y[1] - x[1])) console.error(`  ${String(v).padStart(4)}  ${k}`);
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
+// ~/.claude/skills/retro is a symlink, so compare real paths or main never runs and the harvest is silently empty.
+const entry = (() => { try { return fs.realpathSync(process.argv[1] || ''); } catch { return process.argv[1] || ''; } })();
+if (import.meta.url === pathToFileURL(entry).href) {
   main(process.argv.slice(2)).catch((e) => { console.error(e.message); process.exit(1); });
 }
