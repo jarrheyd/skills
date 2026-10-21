@@ -28,6 +28,13 @@ BLOCKS = [
     ("lucide", '<i data-lucide="check"></i>'),
     ("heading bar", "h2{border-bottom:2px solid #000}"),
     ("hr", "<p>a</p><hr><p>b</p>"),
+    ("eyebrow class", '<p class="eyebrow">The problem</p><h2>Payroll runs late</h2>'),
+    ("eyebrow class jsx", '<span className="hero-kicker">New</span>'),
+    ("eyebrow css", ".eyebrow { font-size: 12px; }"),
+    ("mui overline", '<Typography variant="overline">Pricing</Typography>'),
+    ("all caps label over heading", "<p>THE PROBLEM</p>\n  <h2>Payroll runs late</h2>"),
+    ("tailwind uppercase over heading", '<p className="text-xs uppercase tracking-widest">Command center</p>\n<h1>Today</h1>'),
+    ("inline uppercase over heading", '<span style="text-transform: uppercase">Step one</span><h3>Pick a plan</h3>'),
     ("overgradient", "a{background:linear-gradient(red,blue)} b{background:radial-gradient(red,blue)} c{background:conic-gradient(red,blue)} d{background:linear-gradient(red,blue)}"),
 ]
 
@@ -38,6 +45,12 @@ PASSES = [
     ("hex border", ".card{border:1px solid #E7E2DA}"),
     ("separator hr", '<hr role="separator">'),
     ("heading no bar", "h2{font-weight:700;margin-top:32px}"),
+    ("label over a value", '<small class="text-muted">Nickname</small><h4>Ja</h4>'),
+    ("dynamic badge over heading", '<span className="uppercase">{stage.name}</span><h2>{title}</h2>'),
+    ("caps text not before heading", "<p>FAQ</p><p>Ask us anything.</p>"),
+    ("sentence case date over heading", '<p class="date">Oct 21</p><h2>Release notes</h2>'),
+    ("uppercase element after heading", '<h2>Plans</h2><p class="uppercase">Monthly</p>'),
+    ("kicker word in copy", "<p>The kicker is the price.</p>"),
     ("non design file", ".x{color:#8b5cf6}"),
 ]
 

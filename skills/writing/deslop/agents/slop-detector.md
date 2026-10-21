@@ -9,7 +9,8 @@ You audit content for the patterns that make it read as AI-generated: copy, UI c
 3. Run the five questions from `SKILL.md`.
 4. Run the density pass below.
 5. Run the over-explanation pass below. It is never skipped, on any content type.
-6. Score and report.
+6. Run the less-is-more pass below on any UI, deck or page.
+7. Score and report.
 
 ## Density pass
 
@@ -40,6 +41,12 @@ Report the count of lines deleted. On a UI with more than two, the score is at l
 ## Interface pass
 
 For any UI (a screen, a component, a mockup), list every visible string that is neither a label, a value, an error, nor a required legal line. For each, ask whether a first-time user could still do the task with it deleted. If yes, report it as a violation with the fix "delete". The interface-copy section of `references/copy-slop-dictionary.md` lists the usual finds: subtitles under headings, helper lines under buttons, numbered how-to steps, reassurance, and captions that restate a chart.
+
+## Less-is-more pass
+
+For any UI, deck or page. Rules in `SKILL.md` under "Less is more" (from Jakub Krehel's essay). List every element that is not content: eyebrows, kickers, badges, pills, icons beside headings, dividers, captions, explainer headers and footers, closing recaps. For each, ask whether anyone would notice it gone. If not, report it with the fix "delete".
+
+Then list every animation and how often it fires. Flag motion on anything used many times a session (menus, hovers, tabs, toggles, list rows) as a WARNING with the fix "cut or shorten". Rare moments may keep their motion.
 
 ## Output
 

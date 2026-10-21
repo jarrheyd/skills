@@ -378,7 +378,7 @@ These need a reader. The hook already blocks the regex-able cousins (tool-remnan
 
 ## Formatting habits & eyebrows (2026-08-27)
 
-- **Eyebrows / kickers.** A short ALL-CAPS or label line stuck above a headline ("THE PROBLEM", "INTRODUCING", "WHY IT MATTERS"). AI reaches for these to signal structure. Delete it; the headline carries itself.
+- **Eyebrows / kickers.** A short ALL-CAPS or label line stuck above a headline ("THE PROBLEM", "INTRODUCING", "WHY IT MATTERS"). AI reaches for these to signal structure. Delete it; the headline carries itself. (design hook blocks it in HTML and JSX. See "Less is more" in `SKILL.md`.)
 - **Random line breaks.** AI drops a line break mid-thought, or strands a single sentence on its own line for false weight. If the break is not a real paragraph or a real list item, it is decoration - close it up.
 - **Stray leading dash / rule.** A dash or horizontal rule at the top of a section or slide as ornament. Cut it.
 - **Explainer top-and-tail.** A header that restates what a section/slide is, plus a footer caption that re-explains it. Both are padding; the content is the explanation.

@@ -51,7 +51,7 @@ Every pattern is a regex in `copy_slop_hook.py`; the literal list, with fixes, i
 
 ## What the design hook blocks
 
-AI purple and indigo hexes, the `#667eea` to `#764ba2` gradient, four or more gradients in one file, gradient text, backdrop blur, `border-left: 3-8px solid` accent cards, the `rgba(0,0,0,0.1)` shadow, hairline borders under 0.08 alpha, decorative blur over 20px, `filter: drop-shadow`, Inter / Geist / Space Grotesk in a font stack, Lucide icons, fake terminal-window props, `border-bottom` on headings, decorative `<hr>`.
+AI purple and indigo hexes, the `#667eea` to `#764ba2` gradient, four or more gradients in one file, gradient text, backdrop blur, `border-left: 3-8px solid` accent cards, the `rgba(0,0,0,0.1)` shadow, hairline borders under 0.08 alpha, decorative blur over 20px, `filter: drop-shadow`, Inter / Geist / Space Grotesk in a font stack, Lucide icons, fake terminal-window props, `border-bottom` on headings, decorative `<hr>`, and eyebrows: an `eyebrow`, `kicker`, `overline` or `pretitle` class, an MUI `variant="overline"`, or a short uppercase or ALL-CAPS line directly above an `<h1>` to `<h6>`. A dynamic value or a plain label over a value passes.
 
 Judgment-only visual tells (bento grids, three feature cards, fake testimonials, slide eyebrows, explainer captions, pills and status dots, corner labels) live in `references/design-slop-patterns.md` for the review agent.
 
@@ -84,6 +84,18 @@ Patterns caught by comparing AI drafts with what a person actually sent in the s
    - Demos: scaffolding appears only where a viewer would otherwise be stuck (a code they must type, a password they must use). Never as reassurance. "No money moves", "Nothing you enter is sent", "This is a sample flow" all go. One demo marker per app at most, such as a quiet "Sample data" in the footer, never a box per screen.
    - Drafts as him: a yes is the bare yes. No line clearing the company, no theory of the cause, no mention of what the reader can already see in the attachment or the thread.
 
+## Less is more
+
+From Jakub Krehel's essay (see References). AI makes adding cheap, so the work is deciding what to leave out.
+
+1. Removal is the default. Every addition has to justify itself, and "it looks designed" is not a reason.
+2. No gratuitous text. No label, caption or helper line the reader does not need, no eyebrow or kicker over a heading, no decorative badge, no explainer header or footer, no closing recap.
+3. No decoration that carries no information. If deleting an element loses nothing, delete it.
+4. Animation scales with how often it fires. Something used dozens of times a day (a menu, a hover, a tab switch, a toggle) gets little or no motion. A rare moment (first run, a finished upload, a page change) can have more. A 300ms menu opened 200 times a day costs the user six hours a year.
+5. Decide what moves before tuning how it moves. For a menu opened all day, animate the close and skip the open and the hover fade.
+
+The test: delete it and ask whether anyone would notice. If not, leave it deleted.
+
 ## Review gate after every implementation
 
 Before presenting a feature, a document, a design, copy, or UI:
@@ -91,7 +103,7 @@ Before presenting a feature, a document, a design, copy, or UI:
 1. Sweep the user-facing surfaces: copy, docs, UI choices, generated designs, commit-adjacent prose.
 2. Apply the five questions below, the tells above, and the relevant reference file.
 3. Cut to roughly half the words while keeping every point, silently. Present only the cut version; never show a before-and-after or mention the cut.
-4. Any UI: read every visible string on every screen and delete the ones that explain, instruct, reassure or justify, demo notes included. See tells 17 and 18 and the interface-copy section of `references/copy-slop-dictionary.md`.
+4. Any UI: run the less-is-more pass. Delete eyebrows, badges and decoration that carry no information, and cut motion on anything that fires often. Then read every visible string on every screen and delete the ones that explain, instruct, reassure or justify, demo notes included. See tells 17 and 18 and the interface-copy section of `references/copy-slop-dictionary.md`.
 5. Client-facing, published, or written in someone's voice: run the slop-detector agent.
 6. Fix what it finds, then present. Never present with a "might be sloppy" caveat.
 
@@ -118,6 +130,10 @@ The 2026 Economist study found the modern machine tell is what AI leaves out: lo
 - Earn every element. Delete any paragraph, visual, or section whose removal loses nothing.
 - Show receipts: real data, real screenshots, real process.
 - Removing slop is half the job. A clean draft with no voice is its own tell; add stance and specificity, never new claims.
+
+## References
+
+- Jakub Krehel, "Less is more, more or less", https://jakub.kr/writing/less-is-more. Source of the less-is-more rules: removal as the default, and animation that scales with frequency.
 
 ## Files
 

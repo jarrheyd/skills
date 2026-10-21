@@ -146,7 +146,7 @@ Regex-caught by `hooks/design_slop_hook.py` are marked (hook); the rest need a r
 
 ## Slide-specific tells (2026-08-27 - do NOT do these in decks)
 
-- **No eyebrow / kicker** - the little label above a slide headline ("THE PROBLEM", "INTRODUCING X"). Delete it; the headline stands alone.
+- **No eyebrow / kicker** - the little label above a slide headline ("THE PROBLEM", "INTRODUCING X"). Delete it; the headline stands alone. (hook, in HTML and JSX: an eyebrow-style class, or a short uppercase line directly above a heading)
 - **No dash / rule at the top** of a slide as ornament.
 - **No explainer header** that restates what the slide is ("This slide covers..."). The content IS the explanation.
 - **No footer caption** that re-explains the slide at the bottom. Both the top explainer and bottom caption make a slide wordy - cut both.
@@ -164,3 +164,12 @@ Caught by hand across an eight-round strategy-deck review the write-hooks never 
 - Unverified specifics as fact. Provider counts, adoption ratios, or first-shown prices stated flat with no source you would defend. Fix: verify it, cut it, or mark it a target. Keep a per-deck claims ledger the author can veto.
 - Footers and source lines on slides. Citation lines, production-data stamps, and page furniture at the bottom. Fix: cut them, a slide is one idea shown.
 - Outdated tactics. For a strategy or marketing deck, check the plays against current trends so nothing reads as years old (search-only where the move is AI answers and creator-first).
+
+## Less is more (2026-10-21)
+
+From Jakub Krehel, "Less is more, more or less" (https://jakub.kr/writing/less-is-more). AI makes adding free, so every element now has to earn its place, and removal is the default.
+
+- Gratuitous text: labels, captions and helper lines the reader does not need. An eyebrow or kicker over a heading (hook), a decorative badge ("New", "Beta", "AI") on something that is neither new nor beta, an explainer header or footer, a closing recap. Fix: delete each one, then check a first-time user still gets it.
+- Decoration with no information: icons beside every heading, dot grids, ornamental dividers, a pill that repeats the heading, a status dot that never changes. Delete it; if nothing is lost, leave it deleted.
+- Motion that ignores frequency. Animation scales with how often it fires. A menu, hover, tab switch or toggle used all day gets little or no motion; a 300ms open on a menu used 200 times a day is six hours a year of waiting. Rare moments (first run, a finished upload, a page change) can carry more. Fix: for frequent controls, cut the entry animation and the hover fade, keep a short exit if any.
+- Adding instead of deciding: three ways to do one thing, a setting for every edge case, a second panel that repeats the first. Pick one and cut the rest.

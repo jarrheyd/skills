@@ -7,7 +7,7 @@ Targets the signatures intentional brand design does NOT use, so on-brand work (
 hex borders, a real typeface, a single purposeful gradient) passes, while the AI defaults get
 stopped: AI purple, the ChatGPT gradient, gradient text, glassmorphism, left-border accent
 cards, the generic rgba(0,0,0,0.1) shadow, ultra-faint card outlines, decorative blur blobs,
-Inter-as-default, and overgradient.
+Inter-as-default, overgradient, and eyebrow labels above headings.
 
 Everything here blocks; there is no warn tier. Bypass a session with DISABLE_ANTI_SLOP_HOOK=1.
 
@@ -65,6 +65,35 @@ TELLS = [
 ]
 
 
+# Eyebrow / kicker: a short label line stuck above a heading. Matched narrowly so
+# ordinary markup passes: an explicit eyebrow-style class name, or a short element directly
+# before an <h1>-<h6> that is set uppercase or written in ALL CAPS. A dynamic value ({...}) and a
+# plain small label over a value (Nickname over a name) pass: those carry information.
+EYEBROW_CLASS = re.compile(
+    r"(?i)(?:class(?:Name)?\s*=\s*[\"'{`][^>]*?\b|^\s*\.)(?:eyebrow|kicker|overline|pretitle|supertitle)\b"
+    r"|\bvariant\s*=\s*[\"'{]?\s*[\"']?overline\b",
+    re.M,
+)
+LABEL_BEFORE_HEADING = re.compile(
+    r"(?is)<(p|span|div|small|label|strong|em|b)\b([^>]*)>\s*([^<]{1,40}?)\s*</\1>\s*<h[1-6]\b"
+)
+
+
+def eyebrow(content):
+    if EYEBROW_CLASS.search(content):
+        return ["eyebrow / kicker class (eyebrow, kicker, overline, pretitle) - a label line over a heading; delete it, the heading carries itself"]
+    for m in LABEL_BEFORE_HEADING.finditer(content):
+        attrs, text = m.group(2), m.group(3)
+        if "{" in text:
+            continue
+        letters = re.sub(r"[^A-Za-z]", "", text)
+        all_caps = len(letters) >= 3 and letters.isupper()
+        styled = re.search(r"(?i)\buppercase\b|text-transform\s*:\s*uppercase|textTransform", attrs)
+        if all_caps or styled:
+            return [f"eyebrow above a heading ('{text.strip()[:30]}') - a small or uppercase label line over a heading; delete it, the heading carries itself"]
+    return []
+
+
 def overgradient(content):
     n = len(re.findall(r"(?i)(?:linear|radial|conic)-gradient\(", content))
     if n >= 4:
@@ -102,6 +131,7 @@ def main():
 
     hits = [msg for rx, msg in TELLS if re.search(rx, content)]
     hits += overgradient(content)
+    hits += eyebrow(content)
 
     if hits:
         parts = [f"Design AI-Slop BLOCKED - {len(hits)} tell(s) in {os.path.basename(fp)}:\n"]
