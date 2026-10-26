@@ -19,6 +19,8 @@ import json
 import os
 import subprocess
 import sys
+try: __import__('sys').path.insert(0, __import__('os').path.expanduser('~/.claude/hooks')); __import__('hooklog').install('artifact_slop')  # fire log for the experiments (10-26)
+except Exception: pass
 
 HOOK_DIR = os.path.dirname(os.path.abspath(__file__))
 COPY = os.path.join(HOOK_DIR, "copy_slop_hook.py")

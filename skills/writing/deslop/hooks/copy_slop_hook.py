@@ -15,6 +15,8 @@ import json
 import os
 import re
 import sys
+try: __import__('sys').path.insert(0, __import__('os').path.expanduser('~/.claude/hooks')); __import__('hooklog').install('copy_slop')  # fire log for the experiments (10-26)
+except Exception: pass
 # File patterns to check
 PROSE_EXTENSIONS = {".md", ".mdx", ".txt", ".html", ".htm"}
 
@@ -162,6 +164,23 @@ BANNED_PHRASES = [
     (r"(?i)\b(?:is|are|was|were)\s+not\s+(?:\w+ing\s+)?\w+(?:\s+\w+){0,4},\s+(?:it'?s|they'?re|but)\s+(?:\w+ing\s+)?\w+|\b(?:isn'?t|aren'?t)\s+(?:about\s+)?\w+(?:\s+\w+){0,4},\s+(?:it'?s|they'?re|but)\s+",
      "philosophical reduction: 'X is not Y, it's Z' - the not-X-but-Y reframe in a lab coat; state the claim plainly"),
     (r"(?i)\bno\s+\w+(?:\s+\w+)?,\s+no\s+\w+(?:\s+\w+)?[,.]\s*(?:just|only)\s+\w+", "'no X, no Y, just Z' - a slogan shape; write the sentence"),
+
+    # Thought-leadership tells (2026-10-26). His essay draft passed every check above and still
+    # read machine-made; these are the moves it leaned on. See copy-slop-dictionary.md.
+    (r"(?i)\b(?:has|had|have)\s+a\s+(?:name|word|term)\s+for\s+(?:this|it|that)\b|\b(?:said|put|says|puts)\s+it\s+(?:well|best|perfectly)\b|\bwhat\s+helped\s+(?:me\s+)?was\s+an?\s+(?:old\s+)?(?:idea|line|book)\b|\bthere'?s\s+a\s+(?:great\s+)?line\s+(?:in|from|by)\b",
+     "thinker bridge: 'Senge has a name for this' / 'X said it well' - the famous-name pivot that turns a moment into a lesson; quote them only where you actually thought of them, and say when"),
+    (r"(?i)\bthat\s+(?:last|first|second|one)\s+(?:number|line|part|bit|stat|detail)\s+(?:bothered|stuck\s+with|stayed\s+with|hit|got\s+to|haunted)\b|\bthis\s+(?:changed|shifted|reframed)\s+how\s+i\s+(?:think|see|look)\b|\btaught\s+me\s+more\s+about\s+[^.]{1,40}?\s+than\s+(?:it\s+did\s+)?(?:about\s+)?\w+",
+     "signpost reflection: 'that last number bothered me' / 'this changed how I think' / 'taught me more about X than Y' - announcing the insight instead of having it; cut the frame and say the thought"),
+    (r"(?i)(?:^|[.!]\s+)the\s+(?:fix|answer|solution|lesson|trick|cure)\s+(?:was|is|turned\s+out\s+to\s+be)\s+(?:boring|simple|obvious|embarrassingly\s+simple|almost\s+embarrassing|anticlimactic)\b",
+     "modest-reveal: 'the fix was boring' - a drumroll dressed as humility; just describe the fix"),
+    (r"(?i)\bi\s+(?:think|suspect|bet)\s+a\s+lot\s+of\s+(?:companies|leaders|leading|founders|teams|people|managers|executives|us)\b|\bit'?s\s+the\s+same\s+(?:thing|pattern|story|lesson)\s+(?:that\s+happens\s+)?(?:in|with|at|for)\s+(?:companies|teams|organi[sz]ations|work|leadership|people)\b",
+     "zoom-out: 'I think a lot of companies...' / 'it's the same in companies' - the turn from my story to everyone's lesson; leave the generalising to the reader"),
+    (r"(?i)(?:^|[.!]\s+)so\s+(?:count|measure|write|ship|do|build|say|test|try|own)\s+(?:it|that|them)\.\s*$",
+     "imperative echo closer: 'So count it.' - a slogan ending that repeats the setup word; delete it"),
+    (r"(?i)(?:^|[.!]\s+)same\s+(?:problem|story|idea|thing|lesson|pattern|question)(?:\s+(?:underneath|underneath\s+it\s+all|at\s+heart))?\.\s*$",
+     "fragment punch: 'Same problem underneath.' - a clipped verdict line; write the full thought or drop it"),
+    (r"(?i)\bthe\s+scarce\s+thing\b|\bthe\s+bottleneck\s+(?:moves|moved|shifts|shifted)\b|\bwhat'?s\s+(?:scarce|short)\s+(?:now\s+)?is\b",
+     "era-sweep thesis: 'the scarce thing moved' / 'the bottleneck moves to' - think-piece register; name the actual thing you ran short of, in your week"),
 ]
 
 # ============================================================
@@ -472,6 +491,11 @@ def extract_string_literals(content, file_path=""):
     else:
         found = [m.group(1) if m.group(1) is not None else m.group(2) for m in re.finditer(
             r'(?:"([^"\\\n]*(?:\\.[^"\\\n]*)*)"|\'([^\'\\\n]*(?:\\.[^\'\\\n]*)*)\')', content)]
+    if os.path.splitext(file_path or "")[1].lower() in (".jsx", ".tsx"):
+        # Static JSX text is visible copy even when it is not a quoted string.
+        # Keep each node separate, as with labels in neighbouring string literals.
+        markup = re.sub(r"<(script|style|pre|code)\b[^>]*>.*?</\1\s*>", "", content, flags=re.I | re.S)
+        found.extend(re.findall(r">([^<>{}]+)<", markup))
     strings = [s for s in found if s and len(s) > 20 and " " in s.strip()]
     return "\n\n".join(strings)
 
@@ -718,7 +742,7 @@ def check_stacked_short_sentences(content):
         counts = [len(sn.split()) for sn in sents]
         for j in range(len(counts) - 2):
             window = counts[j:j + 3]
-            if max(window) <= 9 and max(window) - min(window) <= 2 and min(window) >= 3:
+            if max(window) <= 9 and max(window) - min(window) <= 2 and min(window) >= 2:
                 line_no = 0
                 for k, line in enumerate(content.split("\n"), 1):
                     if p[:40] in line:
@@ -768,6 +792,53 @@ def check_landing_closer(content):
                 line_no = k
                 break
         violations.append((line_no, "[BLOCK] closing line built to land ('" + body[:40] + "') - it adds no fact; delete it or replace it with the thing it is gesturing at"))
+    return violations
+
+
+def check_thought_leadership_shape(content):
+    """BLOCK: paragraph shapes of the generated think-piece (2026-10-26).
+
+    1. A paragraph that is one short 'So ...' sentence: the tidy restatement after a data point
+       ('So it sounds like me and still doesn't know what I know.').
+    2. A paragraph that ends on a matched pair: two short sentences opening on the same word and
+       sharing a verb phrase ('A token count tells you X. A paid invoice tells you Y.').
+    3. A clause built as a balanced reversal joined by 'and': 'I got the speed, and the quality
+       stayed flat.' / 'Building got cheap, and coordinating stayed expensive.'
+    """
+    violations = []
+    cleaned = _strip_code_and_tables(content)
+    lines = content.split("\n")
+
+    def line_of(text):
+        for k, line in enumerate(lines, 1):
+            if text[:40] in line:
+                return k
+        return 0
+
+    for para in re.split(r"\n\s*\n", cleaned):
+        p = para.strip()
+        if not p or p.startswith(("#", "-", "*", "`", "|", ">")):
+            continue
+        sents = [sn.strip() for sn in _split_sentences(p) if sn.split()]
+        if len(sents) == 1 and re.match(r"(?i)^so\s+", sents[0]) and 4 <= len(sents[0].split()) <= 14 \
+                and not re.match(r"(?i)^so\s+i\s+\w+(?:ed|t)\b", sents[0]):
+            violations.append((line_of(sents[0]), "[BLOCK] 'So ...' summary paragraph ('" + sents[0][:40] + "') - a tidy restatement of what the reader just read; delete it or keep going with the story"))
+        if len(sents) >= 2:
+            a, b = sents[-2], sents[-1]
+            aw, bw = a.lower().split(), b.lower().split()
+            if 4 <= len(aw) <= 16 and 4 <= len(bw) <= 16 and aw[0] == bw[0]:
+                big_a = {" ".join(aw[i:i + 2]) for i in range(1, len(aw) - 1)}
+                big_b = {" ".join(bw[i:i + 2]) for i in range(1, len(bw) - 1)}
+                # pure anaphora ('Only people can love. Only people can play.') differs by one
+                # word and is a list, not a mirrored verdict; leave it alone
+                anaphora = len(aw) == len(bw) and sum(x != y for x, y in zip(aw, bw)) <= 1
+                if big_a & big_b and not anaphora:
+                    violations.append((line_of(b), "[BLOCK] matched closing pair ('" + a[:30] + "... / " + b[:30] + "...') - two mirrored sentences built to land; keep the one that carries the fact"))
+        for sn in sents:
+            m = re.match(r"(?i)^([^,]{3,40}),\s+and\s+([^,]{3,50})[.!]?$", sn)
+            if m and re.search(r"(?i)\b(?:stayed|stays|remained|got|gets|became|went)\s+(?:flat|the\s+same|expensive|cheap|hard|easy|slow|fast|put|stuck)\b", sn) \
+                    and re.search(r"(?i)\b(?:got|gets|became|went|i\s+got)\b", m.group(1)):
+                violations.append((line_of(sn), "[BLOCK] balanced reversal ('" + sn[:45] + "') - a contrast built for rhythm; say what happened with the real detail"))
     return violations
 
 
@@ -1268,7 +1339,8 @@ def main():
     restate = check_restatement(content)
     tics = (check_structural_tics(content) + check_emoji_bullets(content)
             + check_uniform_sentences(content) + check_label_every_block(content)
-            + check_stacked_short_sentences(content) + check_landing_closer(content))
+            + check_stacked_short_sentences(content) + check_landing_closer(content)
+            + check_thought_leadership_shape(content))
     # Everything blocks; there is no warn tier. Density, filler transitions, weak copulas,
     # -ing tails, wordy phrases and false ranges all block. Em dashes block on any occurrence.
     # Paragraph-length uniformity is deliberately not checked: it false-positives on every

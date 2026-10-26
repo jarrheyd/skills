@@ -500,3 +500,34 @@ Mined from his own pushback in Claude Code transcripts (July to October 2026), t
 ### Reports to him
 - 2026-10-01 and 2026-10-02. "your responses are so wordy", "your drafts are always so long". -> Outcome first, one line per point.
 - 2026-08-17. A plan "toooooo wordy". -> Half the words, every point.
+
+## Thought-leadership tells (added 2026-10-26)
+
+Found when his valley essay and LinkedIn drafts passed every check above and he still said they read as AI. The word-level checks were clean. What gave them away was the shape of a generated think-piece. Sources: his own drafts (the case set), Wikipedia "Signs of AI writing" (Oct 2026 revision), Hiration "AI slop on LinkedIn" (2026), magicpost.in reach study of LinkedIn tells (Apr to Sep 2026), CNN on LinkedIn's slop classifier (2026-10-18).
+
+### Enforced by the hook (copy_slop_hook.py, 2026-10-26)
+- Thinker bridge. "Senge has a name for this", "Elena Verna said it well", "What helped was an old idea from Kahneman", "There's a line in...". A famous name dropped mid-post to turn a moment into a lesson. Every one of his drafts had exactly one, in the middle, as a template.
+- Signpost reflection. "That last number bothered me the most", "This changed how I think about AI at work", "Building the valley taught me more about running a company than about AI". The sentence announces that an insight is coming instead of having it.
+- Modest reveal. "The fix was boring." A drumroll dressed as humility.
+- Zoom-out. "I think a lot of companies are about to...", "I think a lot of leading looks like this", "It's the same thing that happens in companies." The turn from my story to everyone's lesson.
+- Imperative echo closer. "So count it." Fragment punch. "Same problem underneath."
+- Era-sweep thesis. "So the scarce thing moved again. Factories were short on labor, offices were short on expertise, and now..." Think-piece register with a historical tricolon.
+- "So ..." summary paragraph. A one-sentence paragraph that restates the data the reader just saw: "So it sounds like me and still doesn't know what I know."
+- Matched closing pair. "A token count tells you how hard the machine worked. A paid invoice tells you whether anyone needed it." Two mirrored sentences built to land. (Pure anaphora that changes one word, "Only people can love. Only people can play.", is left alone; he writes that.)
+- Balanced reversal. "I got the speed, and the quality stayed flat." / "Building got cheap, and coordinating stayed expensive." The not-X-but-Y antithesis hidden behind "and".
+
+### Judgment only (the reviewer and the routine apply these)
+- Forced parable. A small event, then an oversized lesson, with the story built backward from the takeaway (Hiration 2026). Test: would he tell this story at dinner without the lesson attached? If the story only exists to deliver the point, it is a parable.
+- The template arc. Moment, then a famous name, then the lesson, then a zoom-out to everyone, then a quiet callback to the opening image. One of these is writing. All five in order is a generator. Break the arc: drop the zoom-out, let the thinker come first, or end somewhere the opening didn't predict.
+- Callback ending. The last line returns to the first image ("walking around a little pixel valley, looking for the '!'"; "They just waited a whole day."). Clever once, a signature when it is every post.
+- Stacked statistics. "5 of 64... 168 of 239... about 13%... every 16 hours" in two sentences. Numbers used as rhetoric. Keep the one number he would actually say out loud.
+- Humility beat. A scheduled admission of uncertainty ("I don't know yet if this holds at company scale") placed where a template says humility goes. Real doubt is specific about what he doesn't know and why.
+- Everything resolved. Every paragraph has a job, nothing is left hanging, no tangent survives. His real posts wander: a Kindle on a trip, a reel from @blakeoftoday, a "(...lol)" aside about fake news. Uniform over-polish is itself the tell (Hiration 2026).
+- Corrective framing (new mid-2026). "rather than", "does not establish", "should not be confused with". Wikipedia notes these were near unheard-of before July 2026. Fine once; a tell when it sets up the thesis.
+- No lived detail. Since 2026-07-27 LinkedIn's slop classifier pushes down posts with no concrete detail or lived experience, and posts with concrete detail gained about 21% reach (magicpost.in). Lived detail means a place, a time of day, who was there, what he actually typed, what he got wrong.
+
+### What fixes it for him
+- Build the post from his own sentences. His typed asks to his chats ("ugh i really dont like that things dont resume directly anywhere", "has speed but not quality and follow through", "i want it to replace my claude app") are the most human material available. Quote them, lowercase and typos intact.
+- Let the piece have one tangent that doesn't pay off.
+- Use his texture from fieldnotes: "Growing up,", "Ironically,", "I'm genuinely excited about it", one "lol", long gentle sentences, a slightly loose phrase ("in the speed of light"). Punchy short lines are the generator's habit, not his.
+- End where the thought actually stopped, even mid-question. No callback, no verdict.

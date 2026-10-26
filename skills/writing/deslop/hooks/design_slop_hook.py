@@ -18,6 +18,8 @@ import json
 import os
 import re
 import sys
+try: __import__('sys').path.insert(0, __import__('os').path.expanduser('~/.claude/hooks')); __import__('hooklog').install('design_slop')  # fire log for the experiments (10-26)
+except Exception: pass
 
 DESIGN_EXTS = {".html", ".htm", ".css", ".scss", ".tsx", ".jsx", ".vue", ".svelte"}
 

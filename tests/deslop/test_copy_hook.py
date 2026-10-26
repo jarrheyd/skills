@@ -17,6 +17,8 @@ def run(content, path="draft.md", tool="Write"):
 
 
 BLOCKS = [
+    ("two-word fragments in paragraph", "<p>A degree. A desk. A career.</p>"),
+
     ("ease tag once", "Sign in with your app password, once."),
     ("ease tag straight in", "Your account is linked, straight in."),
     ("fast-paced opener", "In today's fast-paced world we ship."),
@@ -245,6 +247,18 @@ class SendGate(unittest.TestCase):
 
     def test_non_send_mcp_ignored(self):
         self.assertEqual(run_send("mcp__Discord__read_channel", {"channel": "x"})[0], 0)
+
+
+
+
+class ClippedJsxTests(unittest.TestCase):
+    def test_visible_jsx_fragments_are_checked(self):
+        code, error = run("export default () => <p>A degree. A desk. A career.</p>", path="page.tsx")
+        self.assertEqual(code, 2, error)
+
+    def test_separate_labels_stay_separate(self):
+        code, error = run("export default () => <><label>Invoice amount</label><label>Payment date</label><label>Client account</label></>", path="page.tsx")
+        self.assertEqual(code, 0, error)
 
 
 if __name__ == "__main__":
