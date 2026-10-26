@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.2.1
+
+### Patch Changes
+
+- [`162a35a`](https://github.com/jarrheyd/skills/commit/162a35a9b75026bee58a39aac87f729ccb4e6ddd) Thanks [@jarrheyd](https://github.com/jarrheyd)! - Catch short fragment runs in paragraph and static JSX copy.
+
+- [`7816c0c`](https://github.com/jarrheyd/skills/commit/7816c0c20c45673205dab34830c692ab3d523355) Thanks [@jarrheyd](https://github.com/jarrheyd)! - deslop: the copy hook and slop dictionary catch more tells. retro: harvest reads his replies typed in the valley messenger and works when run through the skills symlink.
+
+- [`73ff0ff`](https://github.com/jarrheyd/skills/commit/73ff0ffdfbd85e394a53815c16282724958a3e29) Thanks [@jarrheyd](https://github.com/jarrheyd)! - Reinstall the Playwright browser before a regression run, and drop valley resume prompts from the retro harvest.
+
 ## 2.2.0
 
 ### Minor Changes
