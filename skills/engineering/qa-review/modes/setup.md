@@ -45,7 +45,7 @@ From the templates, adapted to the real code:
 
 ## 5b. Make the project ready for a regression run
 
-So `qa-review regression` is one repeatable command on this project:
+Set these up and `qa-review regression` runs as one repeatable command on this project:
 
 - Test data: if the repo has a seed or fixture script, set `seedCmd` to it. It must first clear what earlier runs left on the test accounts (created pages, groups, posts, invites), then create fresh data and print the ids flows need as `KEY=VALUE` lines. Without the reset, leftovers pile up and cause duplicate-name prompts, long lists and flaky pickers. Flows that create things should name them with a timestamp so the reset can find exactly those. No script yet: write a small one over the API.
 - Ordered scenarios: existing scripts that run several flows in order with API steps between (`run-*.sh` and similar) go into `scenarios` with the flows each one runs, plus `scenarioEnv`. A flow that only needs its own data prepared goes in `flowSetup` instead.

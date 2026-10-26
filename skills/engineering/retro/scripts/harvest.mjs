@@ -25,6 +25,9 @@ const DROP_PREFIXES = [
 ];
 // valley briefs and relays that reach a chat through the office plugin (not his words)
 const VALLEY_MACHINE = /^(From Jarrhey's mission control|Reply with the single word|\[from |From the EA brief|Helper chat "|You take over from|You were moved to|Jarrhey moved you to|Jarrhey says close this chat|Still late after|Due within|LATE:|\/[\w:-]+(\s|$))/;
+// valley wakes, probes and relays sent with `claude --resume <id> "<text>"` carry no origin, so they
+// drop by prefix whatever the origin (retro 10-24: ~100 of 402 moments were these)
+const VALLEY_RESUME = /^(Reply with exactly|Ask me with AskUserQuestion, one question "Probe|keeper pass |InTown loop wake|EVENT from mission control|FYI, the valley handled|FOLLOW UP\. You are|HEARTBEAT|Routine failed, fix it now|Your first start hit|Your sign-in stopped|Delivery check|Continue the Codex chat|Your last turn stopped|From valley:|From handoff watch|From checker:)/;
 const OS_PREFIXES = ['<scheduled-task', '[SCHEDULED TASK', '<automation', '(Re-invocation of', 'Another Claude session sent a message'];
 const STRIP_BLOCKS = [
   /<system-reminder>[\s\S]*?<\/system-reminder>/g,
@@ -105,6 +108,7 @@ export function harvestRecords(records, meta = {}) {
     if (head.startsWith('[Request interrupted')) { if (st.acted) push('interrupt', d.timestamp, head.slice(0, 80)); continue; }
     if (DROP_PREFIXES.some((p) => head.startsWith(p))) continue;
     if (OS_PREFIXES.some((p) => head.startsWith(p))) continue;
+    if (VALLEY_MACHINE.test(head) || VALLEY_RESUME.test(head)) continue;
     // Newer transcripts say who spoke; trust that over prefixes when it is there.
     const origin = d.origin && d.origin.kind;
     // His replies typed in the valley messenger arrive through the office plugin as his own

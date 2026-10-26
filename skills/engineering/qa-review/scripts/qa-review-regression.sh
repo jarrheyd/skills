@@ -49,6 +49,9 @@ if [ "$RUNNER" = "playwright" ]; then
   # A Playwright run does not wedge half-way like a device driver, so there is
   # nothing to resume: a spec with no result did not run, and that is reported.
   MAX_RESUMES=0
+  # Something clears ~/Library/Caches now and then, which takes the browser with
+  # it and fails every spec at launch. Reinstall it if it is gone (no-op if present).
+  (cd "$REPO" && npx playwright install chromium-headless-shell >/dev/null 2>&1) || true
 else
   echo "== freshness"
   node "$SCRIPT_DIR/check-flow-freshness.mjs" --repo "$REPO" || true
