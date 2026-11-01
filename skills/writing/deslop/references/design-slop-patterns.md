@@ -186,4 +186,6 @@ From Impeccable's slop catalog (impeccable.style/slop, 67 patterns) and Ridd's l
 - An icon tile above every heading, three or more times.
 - Cards inside cards (`.card .card`). Flatten to one surface.
 
-Review only, no hook (too close to work that is chosen on purpose): three identical feature cards in a row, beige with a fancy italic serif, a tiny label above every heading with subtext under it. Catch these in the impeccable critique.
+The same tells in Tailwind and JSX block too (11-02): `from-purple-500` gradients, `font-inter`, Inter from Google Fonts or next/font, `bg-clip-text`, `backdrop-blur` on a see-through white card, `border-l-4`, `blur-3xl` halos, icon tiles sized `h-12 w-12 rounded-xl`, rounded bordered cards nested in each other, three identical feature cards, a cursor glow built from a template string, beige with an italic serif (skipped when the project has a DESIGN-SYSTEM.md, BRAND-SYSTEM.md or DESIGN.md), and launch copy such as "supercharge" or "unleash".
+
+Review only, no hook: a small label above a heading written in normal case, and grey subtext under every heading. In product screens these are form titles and helper text (770 matches in client apps, nearly all real information), so a hook would block good work. On a marketing page or portfolio, cut them during the impeccable critique.

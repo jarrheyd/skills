@@ -62,6 +62,22 @@ TELLS = [
      "fake terminal-window mockup - an overused AI landing-page prop"),
     (r"(?is)\bh[1-6]\s*(?:,[^{}]*)?\{[^{}]*border-bottom\s*:",
      "bar line under a heading (h1-h6 with border-bottom) - the AI section-divider rule; let the heading's weight and spacing carry it, no underline bar"),
+    (r"(?i)#(?:4f46e5|4338ca|5b21b6|3730a3)\b",
+     "AI indigo (#4f46e5 / #4338ca) - Tailwind's default button color, the reason AI sites lean purple; choose a color with brand intent"),
+    (r"(?i)\bfrom-(?:purple|violet|indigo|fuchsia)-\d{2,3}\b|\b(?:via|to)-(?:purple|violet|indigo|fuchsia)-\d{2,3}\b",
+     "Tailwind purple / indigo gradient (from-purple-500 to-blue-500) - the AI hero gradient; one brand color with intent"),
+    (r"(?i)\bfont-(?:inter|geist)\b|family=(?:Inter|Geist|Space\+Grotesk)\b|import\s*\{[^}]*\b(?:Inter|Geist|Space_Grotesk)\b[^}]*\}\s*from\s*[\"'](?:next/font|geist)",
+     "Inter / Geist loaded as the page font (class, Google Fonts link or next/font) - the default AI typeface; choose type with intent"),
+    (r"\bbg-clip-text\b",
+     "gradient text (bg-clip-text) - a strong AI landing-page tell"),
+    (r"(?i)class(?:Name)?\s*=\s*[\"'{`](?=[^\"'`}]*\bbackdrop-blur)(?=[^\"'`}]*\bbg-white/\d)",
+     "glassmorphism (backdrop-blur on a see-through white card) - AI-default frosted glass; use a solid surface with intent"),
+    (r"\bborder-l-(?:[3-8])\b",
+     "left-border accent stripe (border-l-4) - the generic 'accent card' move"),
+    (r"\bblur-(?:2xl|3xl|\[(?:[2-9]\d|\d{3})px\])\b",
+     "decorative blur blob or halo (blur-3xl) - AI background decoration; delete it"),
+    (r"(?i)\b(?:supercharge|turbocharge|unleash|revolutioni[sz]e|game[- ]chang(?:er|ing)|elevate your)\b",
+     "AI launch-page copy ('supercharge your workflow') - say what it does in plain words"),
     (r"(?i)<hr\b(?![^>]*\brole\s*=\s*[\"']?separator)",
      "decorative <hr> rule - AI section-divider furniture; use whitespace and heading hierarchy instead of a bar"),
 ]
@@ -110,18 +126,40 @@ NUMBERED_LABEL = re.compile(
     r"(?is)>\s*0[1-9]\s*[^\w\s<]\s*[A-Za-z][^<]{0,30}</\w+>\s*(?:<\w+\b[^>]*>[^<]{0,40}</\w+>\s*)?<h[1-6]\b"
 )
 ICON_TILE = re.compile(
-    r"(?is)<(div|span)\b[^>]*class(?:Name)?\s*=\s*[\"'{`][^\"'`}]*\bicon[\w-]*\b[^>]*>(?:(?!</\1>).){0,200}</\1>\s*<h[2-4]\b"
+    r"(?is)<(div|span)\b[^>]*class(?:Name)?\s*=\s*[\"'{`](?:[^\"'`}]*\bicon[\w-]*\b|(?=[^\"'`}]*\b(?:h|w|size)-(?:8|9|1[0-6])\b)(?=[^\"'`}]*\brounded-(?:md|lg|xl|2xl)\b))[^>]*>(?:(?!</\1>).){0,200}</\1>\s*<h[2-4]\b"
 )
+CARD_TRIPLET = re.compile(
+    r"(?is)(<(div|article|li)\b[^>]*class(?:Name)?\s*=\s*([\"'])((?=[^\"']*\b(?:card|feature|tile|rounded(?:-\w+)?|border|shadow(?:-\w+)?)\b)[^\"']+)\3[^>]*>\s*(?:<[^>]+>\s*){0,3}<h[2-4]\b[^>]*>[^<]{1,60}</h[2-4]>\s*<p\b[^>]*>[^<]{1,200}</p>\s*(?:</[^>]+>\s*){0,3}</\2>\s*)"
+    r"<\2\b[^>]*class(?:Name)?\s*=\s*\3\4\3[^>]*>(?:(?!</\2>).){0,400}</\2>\s*<\2\b[^>]*class(?:Name)?\s*=\s*\3\4\3"
+)
+NESTED_CARD_TW = re.compile(
+    r"(?is)class(?:Name)?\s*=\s*[\"'](?=[^\"']*\brounded-(?:lg|xl|2xl|3xl)\b)(?=[^\"']*\bborder\b)[^\"']*[\"'][^>]*>\s*<div\b[^>]*class(?:Name)?\s*=\s*[\"'](?=[^\"']*\brounded-(?:md|lg|xl|2xl)\b)(?=[^\"']*\bborder\b)"
+)
+BEIGE = re.compile(r"(?i)#(?:f5efe6|f4ede[0-9a-f]|f5f0e[0-9a-f]|faf[5-8]f[0-2]|f7f3e[0-9a-f]|efe9df|f2ece[0-9a-f]|fbf8f3)\b|\bbg-(?:stone|amber)-(?:50|100)\b")
+ITALIC_SERIF = re.compile(r"(?is)(?:Instrument\s*Serif|Playfair|Fraunces|DM\s*Serif|Cormorant|EB\s*Garamond|Newsreader)[^{}]{0,200}?(?:font-style\s*:\s*italic|\bitalic\b)|(?:font-style\s*:\s*italic|\bitalic\b)[^{}]{0,200}?(?:Instrument\s*Serif|Playfair|Fraunces|DM\s*Serif|Cormorant|EB\s*Garamond|Newsreader)|\bfont-serif\b[^\"']*\bitalic\b|\bitalic\b[^\"']*\bfont-serif\b")
+
+
+def has_brand_system(fp):
+    """A project that wrote down its own look (DESIGN-SYSTEM.md / BRAND-SYSTEM.md) chose its palette on purpose."""
+    d = os.path.dirname(os.path.abspath(fp or "."))
+    for _ in range(8):
+        if any(os.path.exists(os.path.join(d, n)) for n in ("DESIGN-SYSTEM.md", "BRAND-SYSTEM.md", "DESIGN.md")):
+            return True
+        up = os.path.dirname(d)
+        if up == d:
+            break
+        d = up
+    return False
 NESTED_CARD_CSS = re.compile(r"(?i)\.(card|panel|tile)(?![\w-])[^{},]*?\s\.\1(?![\w-])")
 
 
-def catalog_tells(content):
+def catalog_tells(content, fp=""):
     hits = []
     if ANNOUNCE_PILL.search(content):
         hits.append("'Introducing' pill badge over the hero - the AI launch-page opener; say the news in the headline or cut it")
     if PULSE.search(content) and STATUS_COPY.search(content):
         hits.append("pulsing 'all systems operational' dot - AI landing-page decoration; show status only where a real status feed backs it")
-    if re.search(r"(?i)\bmousemove\b|onMouseMove|pointermove", content) and re.search(r"(?i)radial-gradient\([^)]*var\(--", content):
+    if re.search(r"(?i)\bmousemove\b|onMouseMove|pointermove|onPointerMove", content) and re.search(r"(?i)radial-gradient\([^)]*(?:var\(--|\$\{|clientX|mouse)", content):
         hits.append("glow that follows the cursor - the first hover effect AI hands out; cut it")
     if VANITY_STAT.search(content):
         hits.append("giant '10M+' stat with a tiny label - AI vanity number; use a real, sourced number in a sentence or drop it")
@@ -129,8 +167,12 @@ def catalog_tells(content):
         hits.append("'01 / 02 / 03' section label over a heading - AI section numbering; let the heading carry the section")
     if len(ICON_TILE.findall(content)) >= 3:
         hits.append("icon tile above every heading (3+ times) - the AI feature-grid pattern; drop the tiles or vary the layout")
-    if NESTED_CARD_CSS.search(content):
+    if NESTED_CARD_CSS.search(content) or NESTED_CARD_TW.search(content):
         hits.append("cards inside cards - AI nesting; flatten to one surface")
+    if CARD_TRIPLET.search(content):
+        hits.append("three identical feature cards (same class, heading plus one line each) - the AI feature grid; vary them or say it in a sentence")
+    if BEIGE.search(content) and ITALIC_SERIF.search(content) and not has_brand_system(fp):
+        hits.append("beige background with a fancy italic serif - the 2025 AI 'tasteful' default; pick type and color from a real brand, or write a DESIGN-SYSTEM.md that says why")
     return hits
 
 
@@ -172,7 +214,7 @@ def main():
     hits = [msg for rx, msg in TELLS if re.search(rx, content)]
     hits += overgradient(content)
     hits += eyebrow(content)
-    hits += catalog_tells(content)
+    hits += catalog_tells(content, fp)
 
     if hits:
         parts = [f"Design AI-Slop BLOCKED - {len(hits)} tell(s) in {os.path.basename(fp)}:\n"]

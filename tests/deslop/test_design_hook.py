@@ -44,6 +44,21 @@ BLOCKS = [
     ("numbered label", "<p>01 / Features</p><h2>Built for teams</h2>"),
     ("icon tiles", '<div class="icon">a</div><h3>A</h3><div class="icon">b</div><h3>B</h3><div class="icon-box">c</div><h3>C</h3>'),
     ("nested cards", ".card .card{padding:12px}"),
+    ("tw purple gradient", '<div className="bg-gradient-to-r from-purple-500 to-blue-500">x</div>'),
+    ("indigo hex", "a{color:#4f46e5}"),
+    ("tw inter", '<body className="font-inter">'),
+    ("inter link", '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400" rel="stylesheet">'),
+    ("next font inter", "import { Inter } from 'next/font/google'"),
+    ("tw gradient text", '<h1 className="bg-gradient-to-r from-sky-500 to-teal-400 bg-clip-text text-transparent">Hi</h1>'),
+    ("tw glass card", '<div className="backdrop-blur-md bg-white/10 border">x</div>'),
+    ("tw side stripe", '<div className="border-l-4 border-sky-500 pl-4">x</div>'),
+    ("tw halo", '<div className="absolute h-96 w-96 rounded-full blur-3xl"></div>'),
+    ("launch copy", "<h1>Supercharge your workflow</h1>"),
+    ("tw icon tiles", '<div className="h-12 w-12 rounded-xl">a</div><h3>A</h3><div className="h-12 w-12 rounded-xl">b</div><h3>B</h3><div className="h-12 w-12 rounded-xl">c</div><h3>C</h3>'),
+    ("three cards", '<div class="card"><h3>A</h3><p>x</p></div><div class="card"><h3>B</h3><p>y</p></div><div class="card"><h3>C</h3><p>z</p></div>'),
+    ("tw nested cards", '<div className="rounded-2xl border p-6"><div className="rounded-xl border p-4">x</div></div>'),
+    ("tw cursor glow", "<div onMouseMove={m} style={{background:`radial-gradient(600px at ${x}px ${y}px, #fff, transparent)`}}/>"),
+    ("beige italic serif", "<body style=\"background:#f5efe6\"><h1 style=\"font-family:'Instrument Serif';font-style:italic\">Slow</h1>"),
 ]
 
 PASSES = [
@@ -68,6 +83,11 @@ PASSES = [
     ("mousemove without glow", "<script>el.addEventListener('mousemove',drag)</script>"),
     ("card list", ".card{padding:16px} .card h3{margin:0}"),
     ("card child class", ".pbk-card .card-sub{color:#555}"),
+    ("modal overlay blur", '<div className="fixed inset-0 bg-black/50 backdrop-blur-sm"></div>'),
+    ("career next level", "<p>three real cases at the next level</p>"),
+    ("form sections", '<div className="space-y-2"><h3>Chief complaint</h3><p>x</p></div><div className="space-y-2"><h3>History</h3><p>y</p></div><div className="space-y-2"><h3>Plan</h3><p>z</p></div>'),
+    ("helper text under heading", '<h3>Activity</h3><p className="text-xs text-neutral-500">Visible to clinic staff only.</p>'),
+    ("tw left padding only", '<div className="border-l pl-4">quote</div>'),
     ("bare post number", '<span class="post-num">01</span><h3 class="post-title">think in context</h3>'),
 ]
 
