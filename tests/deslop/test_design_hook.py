@@ -36,6 +36,14 @@ BLOCKS = [
     ("tailwind uppercase over heading", '<p className="text-xs uppercase tracking-widest">Command center</p>\n<h1>Today</h1>'),
     ("inline uppercase over heading", '<span style="text-transform: uppercase">Step one</span><h3>Pick a plan</h3>'),
     ("overgradient", "a{background:linear-gradient(red,blue)} b{background:radial-gradient(red,blue)} c{background:conic-gradient(red,blue)} d{background:linear-gradient(red,blue)}"),
+    ("announce pill", '<span class="pill">Introducing Acme 2.0</span>'),
+    ("announce pill tailwind", '<a className="rounded-full px-3 text-xs"><b>New:</b> agents</a>'),
+    ("status pulse", '<span class="dot animate-pulse"></span> All systems operational'),
+    ("cursor glow", "<script>el.addEventListener('mousemove',e=>{})</script><style>.g{background:radial-gradient(600px at var(--x) var(--y),#fff,transparent)}</style>"),
+    ("vanity stat", '<div class="stat">10M+ <small>users</small></div>'),
+    ("numbered label", "<p>01 / Features</p><h2>Built for teams</h2>"),
+    ("icon tiles", '<div class="icon">a</div><h3>A</h3><div class="icon">b</div><h3>B</h3><div class="icon-box">c</div><h3>C</h3>'),
+    ("nested cards", ".card .card{padding:12px}"),
 ]
 
 PASSES = [
@@ -52,6 +60,15 @@ PASSES = [
     ("uppercase element after heading", '<h2>Plans</h2><p class="uppercase">Monthly</p>'),
     ("kicker word in copy", "<p>The kicker is the price.</p>"),
     ("non design file", ".x{color:#8b5cf6}"),
+    ("skeleton loader pulse", '<div class="h-4 w-32 animate-pulse bg-stone-200"></div>'),
+    ("real count in copy", "<p>We moved 12M rows last night.</p>"),
+    ("plain badge", '<span class="badge">Beta</span>'),
+    ("numbered list item", "<li>01 Install</li><li>02 Run</li>"),
+    ("one icon over heading", '<div class="icon">a</div><h3>Settings</h3>'),
+    ("mousemove without glow", "<script>el.addEventListener('mousemove',drag)</script>"),
+    ("card list", ".card{padding:16px} .card h3{margin:0}"),
+    ("card child class", ".pbk-card .card-sub{color:#555}"),
+    ("bare post number", '<span class="post-num">01</span><h3 class="post-title">think in context</h3>'),
 ]
 
 
