@@ -173,3 +173,17 @@ From Jakub Krehel, "Less is more, more or less" (https://jakub.kr/writing/less-i
 - Decoration with no information: icons beside every heading, dot grids, ornamental dividers, a pill that repeats the heading, a status dot that never changes. Delete it; if nothing is lost, leave it deleted.
 - Motion that ignores frequency. Animation scales with how often it fires. A menu, hover, tab switch or toggle used all day gets little or no motion; a 300ms open on a menu used 200 times a day is six hours a year of waiting. Rare moments (first run, a finished upload, a page change) can carry more. Fix: for frequent controls, cut the entry animation and the hover fade, keep a short exit if any.
 - Adding instead of deciding: three ways to do one thing, a setting for every edge case, a second panel that repeats the first. Pick one and cut the rest.
+
+## Catalog tells (2026-11-02)
+
+From Impeccable's slop catalog (impeccable.style/slop, 67 patterns) and Ridd's live portfolio reviews. The hook now blocks these, each only when two signals meet so ordinary markup passes:
+
+- An "Introducing" or "New:" pill above the hero. Say the news in the headline or cut it.
+- A pulsing dot next to "all systems operational". Show status only where a real feed backs it.
+- A glow that follows the cursor (mousemove plus a radial gradient on CSS variables). It is the first hover effect AI hands out.
+- A giant "10M+" with a tiny label. Use a real, sourced number in a sentence, or drop it.
+- "01 / Features" style section labels over a heading. A bare number set as a design element (a deck divider, a post index) passes.
+- An icon tile above every heading, three or more times.
+- Cards inside cards (`.card .card`). Flatten to one surface.
+
+Review only, no hook (too close to work that is chosen on purpose): three identical feature cards in a row, beige with a fancy italic serif, a tiny label above every heading with subtext under it. Catch these in the impeccable critique.

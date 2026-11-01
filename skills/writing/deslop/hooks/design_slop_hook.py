@@ -29,7 +29,7 @@ SKIP = [
 ]
 
 def relevant(fp):
-    if not fp or any(s in fp for s in SKIP):
+    if not fp or any(s in fp for s in SKIP) or ".min." in os.path.basename(fp):
         return False
     return os.path.splitext(fp)[1].lower() in DESIGN_EXTS
 
@@ -96,6 +96,44 @@ def eyebrow(content):
     return []
 
 
+# Tells from Impeccable's slop catalog (impeccable.style/slop) and Ridd's portfolio reviews,
+# added 11-02 after his saved reels. Each needs two signals together so ordinary markup passes:
+# a skeleton loader may pulse, a stats page may say 10M, a docs page may number its steps.
+ANNOUNCE_PILL = re.compile(
+    r"(?is)<(span|div|a|p|button)\b[^>]*class(?:Name)?\s*=\s*[\"'{`][^>]*?\b(?:pill|badge|chip|rounded-full)\b[^>]*>"
+    r"\s*(?:<[^>]+>\s*)*[^<\w]{0,4}(?:introducing|announcing|new\s*:)"
+)
+STATUS_COPY = re.compile(r"(?i)all\s+systems\s+(?:operational|go|normal)|systems?\s+(?:are\s+)?(?:online|operational)")
+PULSE = re.compile(r"(?i)\banimate-pulse\b|animation(?:-name)?\s*:[^;{}]*\bpulse\b")
+VANITY_STAT = re.compile(r"(?i)>\s*\d+(?:[.,]\d+)?\s*[KMB]\+\s*<")
+NUMBERED_LABEL = re.compile(
+    r"(?is)>\s*0[1-9]\s*[^\w\s<]\s*[A-Za-z][^<]{0,30}</\w+>\s*(?:<\w+\b[^>]*>[^<]{0,40}</\w+>\s*)?<h[1-6]\b"
+)
+ICON_TILE = re.compile(
+    r"(?is)<(div|span)\b[^>]*class(?:Name)?\s*=\s*[\"'{`][^\"'`}]*\bicon[\w-]*\b[^>]*>(?:(?!</\1>).){0,200}</\1>\s*<h[2-4]\b"
+)
+NESTED_CARD_CSS = re.compile(r"(?i)\.(card|panel|tile)(?![\w-])[^{},]*?\s\.\1(?![\w-])")
+
+
+def catalog_tells(content):
+    hits = []
+    if ANNOUNCE_PILL.search(content):
+        hits.append("'Introducing' pill badge over the hero - the AI launch-page opener; say the news in the headline or cut it")
+    if PULSE.search(content) and STATUS_COPY.search(content):
+        hits.append("pulsing 'all systems operational' dot - AI landing-page decoration; show status only where a real status feed backs it")
+    if re.search(r"(?i)\bmousemove\b|onMouseMove|pointermove", content) and re.search(r"(?i)radial-gradient\([^)]*var\(--", content):
+        hits.append("glow that follows the cursor - the first hover effect AI hands out; cut it")
+    if VANITY_STAT.search(content):
+        hits.append("giant '10M+' stat with a tiny label - AI vanity number; use a real, sourced number in a sentence or drop it")
+    if NUMBERED_LABEL.search(content):
+        hits.append("'01 / 02 / 03' section label over a heading - AI section numbering; let the heading carry the section")
+    if len(ICON_TILE.findall(content)) >= 3:
+        hits.append("icon tile above every heading (3+ times) - the AI feature-grid pattern; drop the tiles or vary the layout")
+    if NESTED_CARD_CSS.search(content):
+        hits.append("cards inside cards - AI nesting; flatten to one surface")
+    return hits
+
+
 def overgradient(content):
     n = len(re.findall(r"(?i)(?:linear|radial|conic)-gradient\(", content))
     if n >= 4:
@@ -134,6 +172,7 @@ def main():
     hits = [msg for rx, msg in TELLS if re.search(rx, content)]
     hits += overgradient(content)
     hits += eyebrow(content)
+    hits += catalog_tells(content)
 
     if hits:
         parts = [f"Design AI-Slop BLOCKED - {len(hits)} tell(s) in {os.path.basename(fp)}:\n"]
