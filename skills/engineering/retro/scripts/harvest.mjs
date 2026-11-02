@@ -40,6 +40,10 @@ const STRIP_BLOCKS = [
 const CORRECTION = /^(no\b|nope|wrong|not\b|don'?t|stop|again|still|why did|why are|actually)|you (didn'?t|forgot|missed|broke|should)|i (said|told you|asked|meant)|not what i|try again|should(n'?t)? (be|have)|instead/i;
 // The retry button and a bare "continue" mean the run died or stalled, not that the work was wrong.
 const RETRY = /^(try again( now)?|continue|go on|keep going|resume)[.!]?$/i;
+// A "continue" right after the API itself failed (connection reset, timeout, overload) is network
+// noise, not a miss in the setup. On 10-27 most of one harvest was these, so they are dropped from
+// the moments by default and only counted (--keep-api-retries keeps them).
+export const API_ERROR = /^API Error\b|ECONNRESET|ETIMEDOUT|socket hang up|No response from API|overloaded_error|\b(429|500|502|503|529)\b.*(error|status)|rate.?limit/i;
 const DENIED = /doesn't want to proceed|user denied|permission (was )?denied|rejected by the user/i;
 
 export function clean(text) {
@@ -123,7 +127,7 @@ export function harvestRecords(records, meta = {}) {
     const repeats = st.seen.get(key) || 0;
     st.seen.set(key, repeats + 1);
     if (!st.acted) continue; // the opening ask is not a reaction to anything
-    if (RETRY.test(text)) push('retry', d.timestamp, text);
+    if (RETRY.test(text)) push(API_ERROR.test(st.said.slice(0, 400)) ? 'api-retry' : 'retry', d.timestamp, text);
     else if (repeats > 0 && key.length > 0) push('repeat', d.timestamp, text, { times: repeats + 1 });
     else push('reply', d.timestamp, text, { ...(CORRECTION.test(text) ? { hint: 'correction' } : {}), ...(d.midTurn ? { midTurn: true } : {}) });
   }
@@ -233,6 +237,7 @@ async function main(argv) {
     else if (k === '--out') a.out = argv[++i];
     else if (k === '--summary') a.summary = true;
     else if (k === '--digest') a.digest = true;
+    else if (k === '--keep-api-retries') a.keepApi = true;
     else if (k === '--projects-dir') a.projectsDir = argv[++i];
     else if (k === '--titles-dir') a.titlesDir = argv[++i];
     else throw new Error(`unknown argument ${k}`);
@@ -244,11 +249,13 @@ async function main(argv) {
   const counts = {};
   let total = 0;
   let lastSession = '';
+  let apiDropped = 0;
   for (const f of files) {
     const t = titles.get(f.session) || {};
     const moments = harvestRecords(await readTranscript(f.file), { session: f.session, title: t.title, project: '' });
     for (const m of moments) {
       if (a.since && Date.parse(m.ts) < a.since) continue;
+      if (m.kind === 'api-retry' && !a.keepApi) { apiDropped += 1; continue; }
       if (t.scheduled) m.scheduled = t.scheduled;
       if (a.digest && !a.summary) {
         if (m.session !== lastSession) { out.write(`\n## ${m.title || '(untitled)'} · ${path.basename(m.project || '?')} · ${m.session}${t.scheduled ? ' · scheduled ' + t.scheduled : ''}\n`); lastSession = m.session; }
@@ -262,7 +269,7 @@ async function main(argv) {
     }
   }
   if (a.out) await new Promise((r) => out.end(r));
-  console.error(`${files.length} sessions, ${total} moments`);
+  console.error(`${files.length} sessions, ${total} moments${apiDropped ? `, ${apiDropped} api retries dropped as network noise` : ''}`);
   for (const [k, v] of Object.entries(counts).sort((x, y) => y[1] - x[1])) console.error(`  ${String(v).padStart(4)}  ${k}`);
 }
 

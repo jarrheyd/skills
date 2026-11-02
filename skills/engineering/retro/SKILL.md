@@ -36,7 +36,7 @@ The harvest returns one line per moment, with what the agent said and ran just b
 | `reply mid-turn` | They cut in while the agent was still working, which usually means it was heading the wrong way |
 | `repeat` | They sent the same message again in the same session |
 | `interrupt` | They stopped the agent |
-| `retry` | "try again" or "continue" after the run died or stalled |
+| `retry` | "try again" or "continue" after the run died or stalled. A "continue" right after an API error (ECONNRESET, timeout, overload) is `api-retry`, network noise: dropped and only counted unless `--keep-api-retries` |
 | `tool-fail` | One tool failed three times in a row |
 | `denied` | They declined a tool call |
 

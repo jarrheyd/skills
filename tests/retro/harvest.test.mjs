@@ -69,3 +69,12 @@ test('a mid-turn message is kept and marked', () => {
 test('project folders map to the transcript directory name', () => {
   assert.equal(slugFor('/Users/a/My Project'), '-Users-a-My-Project');
 });
+
+test('a continue after an API error is network noise, not a retry', () => {
+  const m = harvestRecords([
+    user('do it'), said('API Error: Connection dropped (ECONNRESET). A VPN, firewall, or security software can cause this.'),
+    user('continue'),
+    said('the build stalled on the lint step'), user('continue'),
+  ]);
+  assert.deepEqual(m.map((x) => x.kind), ['api-retry', 'retry']);
+});
