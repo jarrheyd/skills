@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.2.2
+
+### Patch Changes
+
+- [`10b1f6e`](https://github.com/jarrheyd/skills/commit/10b1f6e7e97bf6871b10fd92185d975cd12802b5) Thanks [@jarrheyd](https://github.com/jarrheyd)! - deslop: adds a document check script, a bash doc gate hook, shape-tell detection and a regression runner.
+
+- [`e1172be`](https://github.com/jarrheyd/skills/commit/e1172bebc5148e00cbb3528a2a0409b2a58e9a34) Thanks [@jarrheyd](https://github.com/jarrheyd)! - retro: harvest drops a "continue" sent right after an API error (connection reset, timeout, overload) as network noise and only counts it; `--keep-api-retries` keeps them.
+
 ## 2.2.1
 
 ### Patch Changes
