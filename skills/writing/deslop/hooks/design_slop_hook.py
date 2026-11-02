@@ -136,6 +136,7 @@ NESTED_CARD_TW = re.compile(
     r"(?is)class(?:Name)?\s*=\s*[\"'](?=[^\"']*\brounded-(?:lg|xl|2xl|3xl)\b)(?=[^\"']*\bborder\b)[^\"']*[\"'][^>]*>\s*<div\b[^>]*class(?:Name)?\s*=\s*[\"'](?=[^\"']*\brounded-(?:md|lg|xl|2xl)\b)(?=[^\"']*\bborder\b)"
 )
 BEIGE = re.compile(r"(?i)#(?:f5efe6|f4ede[0-9a-f]|f5f0e[0-9a-f]|faf[5-8]f[0-2]|f7f3e[0-9a-f]|efe9df|f2ece[0-9a-f]|fbf8f3)\b|\bbg-(?:stone|amber)-(?:50|100)\b")
+NEAR_BLACK = re.compile(r"(?i)background(?:-color)?\s*:\s*#(?:000|000000|0a0a0a|0b0b0b|0c0c0c|0d0d0d|0f0f0f|111|111111|121212)\b|\bbg-(?:black|neutral-950|zinc-950|stone-950)\b")
 ITALIC_SERIF = re.compile(r"(?is)(?:Instrument\s*Serif|Playfair|Fraunces|DM\s*Serif|Cormorant|EB\s*Garamond|Newsreader)[^{}]{0,200}?(?:font-style\s*:\s*italic|\bitalic\b)|(?:font-style\s*:\s*italic|\bitalic\b)[^{}]{0,200}?(?:Instrument\s*Serif|Playfair|Fraunces|DM\s*Serif|Cormorant|EB\s*Garamond|Newsreader)|\bfont-serif\b[^\"']*\bitalic\b|\bitalic\b[^\"']*\bfont-serif\b")
 
 
@@ -173,6 +174,8 @@ def catalog_tells(content, fp=""):
         hits.append("three identical feature cards (same class, heading plus one line each) - the AI feature grid; vary them or say it in a sentence")
     if BEIGE.search(content) and ITALIC_SERIF.search(content) and not has_brand_system(fp):
         hits.append("beige background with a fancy italic serif - the 2025 AI 'tasteful' default; pick type and color from a real brand, or write a DESIGN-SYSTEM.md that says why")
+    elif NEAR_BLACK.search(content) and ITALIC_SERIF.search(content) and not has_brand_system(fp):
+        hits.append("near-black background with a big italic serif - the 'Claude look' trying to seem expensive; pick type and color from a real brand, or write a DESIGN-SYSTEM.md that says why")
     return hits
 
 
