@@ -164,6 +164,10 @@ class CopyHook(unittest.TestCase):
         p = subprocess.run(["python3", HOOK], input=payload, capture_output=True, text=True, env=env)
         self.assertEqual(p.returncode, 0)
 
+    def test_label_pair_blocks_the_sentence_not_the_template(self):
+        self.assertEqual(run("Today: one team, one product. Next: one team, many products.\n")[0], 2)
+        self.assertEqual(run("BEFORE: original\nAFTER: rewrite\nWHY: the pattern\n")[0], 0)
+
     def test_own_docs_pass_the_gate(self):
         docs = [
             os.path.join(DESLOP, "SKILL.md"),

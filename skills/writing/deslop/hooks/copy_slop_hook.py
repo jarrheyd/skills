@@ -17,6 +17,8 @@ import re
 import sys
 try: __import__('sys').path.insert(0, __import__('os').path.expanduser('~/.claude/hooks')); __import__('hooklog').install('copy_slop')  # fire log for the experiments (10-26)
 except Exception: pass
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from shape_tells import check_shape_tells  # sentence-pair tells he flagged 10-29
 # File patterns to check
 PROSE_EXTENSIONS = {".md", ".mdx", ".txt", ".html", ".htm"}
 
@@ -517,6 +519,41 @@ BANNED_PHRASES += [
 ]
 
 
+# His spelling is American by default (his note 10-27 on the Flex slides: "we seem to use british
+# spelling like practise -- across all my documents"). Lowercase word starts only, so a proper noun
+# such as a client's "Organisation" name in a quote is left alone; a URL or path is skipped too.
+BRITISH_SPELLINGS = [
+    ("practis", "practic"), ("colour", "color"), ("favour", "favor"), ("behaviour", "behavior"),
+    ("honour", "honor"), ("labour", "labor"), ("neighbour", "neighbor"), ("centre", "center"),
+    ("organis", "organiz"), ("prioritis", "prioritiz"), ("realis", "realiz"), ("recognis", "recogniz"),
+    ("optimis", "optimiz"), ("customis", "customiz"), ("standardis", "standardiz"), ("summaris", "summariz"),
+    ("analys", "analyz"), ("apologis", "apologiz"), ("finalis", "finaliz"), ("utilis", "utiliz"),
+    ("catalogue", "catalog"), ("programme", "program"),
+    ("visualis", "visualiz"), ("personalis", "personaliz"), ("licence", "license"), ("maximis", "maximiz"), ("minimis", "minimiz"),
+    ("emphasise", "emphasize"), ("authoris", "authoriz"), ("categoris", "categoriz"),
+    ("characteris", "characteriz"), ("monetis", "monetiz"), ("judgement", "judgment"), ("defence", "defense"),
+    ("enquir", "inquir"), ("modelling", "modeling"), ("travelled", "traveled"), ("cancelled", "canceled"),
+]
+_BRIT_RE = re.compile(r"(?<![\w/.-])(" + "|".join(b for b, _ in BRITISH_SPELLINGS) + r")(?=[a-z]*\b)")
+# analys- also starts "analysis"/"analyst", which are American too
+# and -ist/-ism words (finalist, realism, organism, optimist) are American spellings too
+_BRIT_OK = re.compile(r"^(?:analys(?:is|es|t|ts)|[a-z]+is(?:ts?|ms?|tic|tics|tically))$")
+_BRIT_FIX = dict(BRITISH_SPELLINGS)
+
+
+def check_british_spelling(content):
+    """American spelling by default. Returns list of (line_num, message)."""
+    out = []
+    for i, line in enumerate(content.split("\n"), 1):
+        for m in _BRIT_RE.finditer(line):
+            word = re.match(r"[a-z]+", line[m.start():]).group(0)
+            if _BRIT_OK.match(word) or "://" in line[max(0, m.start() - 60):m.start()]:
+                continue
+            us = _BRIT_FIX[m.group(1)] + word[len(m.group(1)):]
+            out.append((i, f"[BLOCK] British spelling '{word}': he writes American, use '{us}'"))
+            break
+    return out
+
 def check_banned_phrases(content):
     """Check for zero-tolerance banned phrases. Returns list of (line_num, message)."""
     violations = []
@@ -832,7 +869,9 @@ def check_thought_leadership_shape(content):
                 # pure anaphora ('Only people can love. Only people can play.') differs by one
                 # word and is a list, not a mirrored verdict; leave it alone
                 anaphora = len(aw) == len(bw) and sum(x != y for x, y in zip(aw, bw)) <= 1
-                if big_a & big_b and not anaphora:
+                # two sentences that both carry numbers are a data comparison, not a verdict
+                numeric = bool(re.search(r"\d", a)) and bool(re.search(r"\d", b))
+                if big_a & big_b and not anaphora and not numeric:
                     violations.append((line_of(b), "[BLOCK] matched closing pair ('" + a[:30] + "... / " + b[:30] + "...') - two mirrored sentences built to land; keep the one that carries the fact"))
         for sn in sents:
             m = re.match(r"(?i)^([^,]{3,40}),\s+and\s+([^,]{3,50})[.!]?$", sn)
@@ -1248,15 +1287,15 @@ def run_send_checks(body, mode):
         emdash = [(0, f"[BLOCK] em dash present ({body.count(EM_DASH)}x) - banned outright; use a hyphen, comma, or period")]
     if mode in ("chat", "typed"):
         return (check_hard_ban(body) + check_banned_phrases(body) + check_curly_quotes(body)
-                + check_middot_separator(body) + emdash)
+                + check_middot_separator(body) + check_british_spelling(body) + check_shape_tells(body) + emdash)
     blocks = (check_hard_ban(body) + check_banned_phrases(body) + check_curly_quotes(body)
-              + check_title_case_headings(body) + check_bold_overuse(body)
+              + check_british_spelling(body) + check_title_case_headings(body) + check_bold_overuse(body)
               + check_bold_lead_paragraph(body) + check_middot_separator(body)
               + check_explainer_headings(body) + check_restatement(body)
               + check_structural_tics(body) + check_emoji_bullets(body)
               + check_uniform_sentences(body) + check_label_every_block(body)
               + check_stacked_short_sentences(body) + check_landing_closer(body)
-              + check_weak_phrases(body) + emdash)
+              + check_weak_phrases(body) + check_shape_tells(body) + emdash)
     blocks += [(0, w) for w in check_word_density(body)]
     blocks += [(w[0], w[1]) if isinstance(w, tuple) else (0, w) for w in check_filler_transitions(body)]
     return blocks
@@ -1329,7 +1368,7 @@ def main():
         content = html.unescape(content)
 
     # Run checks
-    banned = check_banned_phrases(content)
+    banned = check_banned_phrases(content) + check_british_spelling(content)
     curly = check_curly_quotes(content)
     titlecase = check_title_case_headings(content)
     bold = check_bold_overuse(content)
@@ -1340,7 +1379,7 @@ def main():
     tics = (check_structural_tics(content) + check_emoji_bullets(content)
             + check_uniform_sentences(content) + check_label_every_block(content)
             + check_stacked_short_sentences(content) + check_landing_closer(content)
-            + check_thought_leadership_shape(content))
+            + check_thought_leadership_shape(content) + check_shape_tells(content))
     # Everything blocks; there is no warn tier. Density, filler transitions, weak copulas,
     # -ing tails, wordy phrases and false ranges all block. Em dashes block on any occurrence.
     # Paragraph-length uniformity is deliberately not checked: it false-positives on every

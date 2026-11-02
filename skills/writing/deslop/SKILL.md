@@ -19,6 +19,8 @@ Two hooks run on every Write, Edit and MultiEdit, one on artifacts. Every hit bl
 - `hooks/design_slop_hook.py` reads `.html`, `.css`, `.scss`, `.tsx`, `.jsx`, `.vue`, `.svelte`.
 - `hooks/artifact_slop_hook.py` pulls the body out of an `Artifact` publish or a Drive connector `create_file` / `update_file` and runs both hooks on it. Those writes never touch the local filesystem, so without it they skip the gate.
 - `hooks/copy_slop_hook.py` also gates sends that never touch a file: email drafts and bodies, ticket and wiki comments, and chat-app messages (Discord, Telegram, Teams, iMessage). Chat gets a tells-only subset, since chat voice is lowercase and fragmented and the prose-shape checks misfire on it; email and comments get the full prose set. His named banned words block on the first occurrence here, since the density thresholds never trip on a short message. Wire it on the send tools in `settings.json`.
+- `hooks/bash_doc_gate.py` runs on Bash. A deck or Doc built by a script and pushed over REST never passes a Write hook, so it blocks a Slides, Docs or Drive write (batchUpdate, upload, POST/PATCH/PUT, a `push*.py` or `push*.mjs` script) unless `scripts/deslop_check.py` passed on a document in the last 45 minutes. It also runs the prose checks on a heredoc that writes a `.md`, `.txt` or `.html`.
+- `scripts/deslop_check.py FILE...` checks any file from the command line (`.html` has its tags stripped, source files give their strings). `--chat -` reads a chat draft from stdin; wire it into whatever saves drafts. A document pass writes the stamp the Bash gate reads; a chat pass does not.
 
 Bypass a session with `DISABLE_ANTI_SLOP_HOOK=1`. Exempt paths that repeat by design (ledgers, generated output, a vault's state files) with `DESLOP_SKIP_PATHS=_archive/,build/`. Hooks load at session start; a hook added mid-session protects the next session.
 
@@ -47,6 +49,7 @@ Every pattern is a regex in `copy_slop_hook.py`; the literal list, with fixes, i
 - Hook-and-reveal rhythms: the elliptical setup (a two-word question as a drumroll, then the answer), the suspense-then-answer, the unneeded justifier before a point, the revelation hook (the thing nobody supposedly says), the big-reveal frame (what a thing supposedly is underneath), and overhype (claims of changing everything or starting a revolution).
 - False choices: the opposing shutdown (you do not need X, you need Y), the philosophical reduction (X is not Y, it is Z), and the no-X-no-Y-just-Z slogan.
 - Rhythm: a paragraph of four or more sentences all the same length; emoji used as bullets or line openers.
+- Sentence-pair shapes (`hooks/shape_tells.py`, in files, drafts and chat): a denial flipped by a pronoun that repeats the denied verb, a label-colon antithesis (a "Today:" line answered by a "Next:" line), mirrored short clauses on the same two-word head, a run of three or more verbless number fragments, a two-beat number label before a colon, and a concession revealed with "they just".
 - Density per 500 words: the tier-one AI vocabulary at more than one, the tier-two set at more than two.
 
 ## What the design hook blocks
@@ -131,6 +134,10 @@ The 2026 Economist study found the modern machine tell is what AI leaves out: lo
 - Show receipts: real data, real screenshots, real process.
 - Removing slop is half the job. A clean draft with no voice is its own tell; add stance and specificity, never new claims.
 
+## Keeping it current
+
+Every line a reader flags as slop becomes a regression case. `scripts/deslop_check.py --learn "<line>" --why "<their words>"` appends it to `flagged.txt` in the data folder (`$DESLOP_DATA`, default `~/.claude/deslop-data`; it holds the author's own messages, so it lives outside this repo). `scripts/regress.py` then fails until a check blocks every flagged line, and also fails when a check blocks any message in `his-sends-sample.txt`, the author's real sends. Run it after every change to a hook. Schedule both on a recurring check so a complaint never has to be made twice.
+
 ## References
 
 - Jakub Krehel, "Less is more, more or less", https://jakub.kr/writing/less-is-more. Source of the less-is-more rules: removal as the default, and animation that scales with frequency.
@@ -142,6 +149,10 @@ The 2026 Economist study found the modern machine tell is what AI leaves out: lo
 | `hooks/copy_slop_hook.py` | Copy gate |
 | `hooks/design_slop_hook.py` | Visual gate |
 | `hooks/artifact_slop_hook.py` | Artifact and Drive connector gate |
+| `hooks/shape_tells.py` | Sentence-pair shapes, imported by the copy gate |
+| `hooks/bash_doc_gate.py` | Bash gate for document pushes and heredoc writes |
+| `scripts/deslop_check.py` | Command-line check, learn mode, push stamp |
+| `scripts/regress.py` | Flagged lines must block, the author's sends must pass |
 | `scripts/flat_prose.py` | Review-only advisory for airless prose (the absence tells); never blocks |
 | `references/copy-slop-dictionary.md` | Full copy catalog, including judgment tells the hook cannot regex |
 | `references/design-slop-patterns.md` | Visual and slide tells |
@@ -149,3 +160,5 @@ The 2026 Economist study found the modern machine tell is what AI leaves out: lo
 | `references/image-slop-tells.md`, `social-slop-patterns.md`, `video-slop-tells.md`, `website-slop-formula.md` | Secondary catalogs by medium |
 | `agents/slop-detector.md` | Audit agent: score, violations, top fixes |
 | `agents/copy-humanizer.md` | Rewrite agent: strip tells, then add voice |
+
+Whole-file audit (2026-11-02): `scripts/doc_audit.py <Slides or Docs id or link>` reads every line in a live deck or doc, speaker notes included, runs the copy checks, and flags deck-level shapes a single line never shows (the "Label: subtitle" headline on three or more slides, the same opener on three or more lines). The Bash push gate needs it on the same file id within 45 minutes before any batchUpdate to that file, and reads the text inside the push itself.
