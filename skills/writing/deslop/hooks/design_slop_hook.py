@@ -179,8 +179,65 @@ def catalog_tells(content, fp=""):
     return hits
 
 
+def css_parts(value, separator=','):
+    """Split CSS arguments or words without splitting nested functions or quoted strings."""
+    out, start, depth, quote, escaped = [], 0, 0, None, False
+    for i, char in enumerate(value):
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\":
+            escaped = True
+        elif quote:
+            if char == quote:
+                quote = None
+        elif char in "\"'":
+            quote = char
+        elif char == '(':
+            depth += 1
+        elif char == ')':
+            depth -= 1
+        elif depth == 0 and (char == separator if separator else char.isspace()):
+            if value[start:i].strip():
+                out.append(value[start:i].strip())
+            start = i + 1
+    if value[start:].strip():
+        out.append(value[start:].strip())
+    return out
+
+
+def hard_stops(body):
+    stops = css_parts(body)
+    if stops and re.match(r"(?i)^(?:to\b|from\b|at\b|circle\b|ellipse\b|[+-]?[\d.]+(?:deg|turn|rad|grad)\b)", stops[0]):
+        stops = stops[1:]
+    if len(stops) < 2:
+        return False
+    end = None
+    for stop in stops:
+        positions = css_parts(stop, None)[1:]
+        if not positions or (end is not None and positions[0] not in (end, '0')):
+            return False
+        end = positions[-1]
+    return True
+
+
 def overgradient(content):
-    n = len(re.findall(r"(?i)(?:linear|radial|conic)-gradient\(", content))
+    content = re.sub(r"/\*[\s\S]*?\*/", '', content)
+    n = 0
+    for match in re.finditer(r"(?i)(?:repeating-)?(?:linear|radial|conic)-gradient\(", content):
+        start, depth, end = match.end(), 1, match.end()
+        while end < len(content) and depth:
+            depth += (content[end] == '(') - (content[end] == ')')
+            end += 1
+        declaration = content[max(content.rfind(c, 0, match.start()) for c in ';{}') + 1:match.start()]
+        prop = re.match(r"\s*([-\w]+)\s*:", declaration)
+        if prop and prop[1].lower() in ('mask', 'mask-image', '-webkit-mask', '-webkit-mask-image'):
+            continue
+        rule = content[content.rfind('{', 0, match.start()) + 1:content.find('}', end) if '}' in content[end:] else end]
+        thin = any(0 < float(v) <= 4 for v in re.findall(r"(?i)(?:^|;)\s*(?:height|width)\s*:\s*((?:\d+(?:\.\d+)?|\.\d+))px\b", rule))
+        if thin or (depth == 0 and hard_stops(content[start:end - 1])):
+            continue
+        n += 1
     if n >= 4:
         return [f"overgradient ({n} gradients) - gradients used as decoration; a brand uses one with purpose, not four"]
     return []

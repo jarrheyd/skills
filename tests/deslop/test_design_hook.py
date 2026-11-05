@@ -106,6 +106,31 @@ class DesignHook(unittest.TestCase):
                 code, err = run(text, path)
                 self.assertEqual(code, 0, f"{name!r} should pass; stderr: {err}")
 
+    def test_functional_gradients_do_not_count_as_decoration(self):
+        css = """
+        .fade { mask-image: linear-gradient(#000 70%,transparent); -webkit-mask-image: linear-gradient(#000,transparent); }
+        .hatch { background: repeating-linear-gradient(135deg,color-mix(in srgb,var(--c) 30%,transparent) 0 3px,transparent 3px 7px); }
+        select { background: linear-gradient(45deg,transparent 50%,var(--ink) 50%),linear-gradient(135deg,var(--ink) 50%,transparent 50%); background-size:5px 5px; }
+        .ring { background:conic-gradient(var(--c,var(--app)) calc(var(--p)*1%),var(--sunk) 0); }
+        .progress { background:linear-gradient(90deg,var(--app) calc(var(--p) * 100%),var(--line) 0); }
+        .corner { background:linear-gradient(225deg,var(--warn) 0 6px,transparent 6px); }
+        .cost { height:3px; background:linear-gradient(90deg,var(--bad),var(--good)); }
+        """
+        code, err = run(css, 'functional.css')
+        self.assertEqual(code, 0, err)
+
+    def test_functional_gradients_do_not_hide_four_decorative_gradients(self):
+        decorative = ' '.join(f'.hero{i} {{background:linear-gradient(red,blue)}}' for i in range(4))
+        code, err = run('.mask{mask-image:linear-gradient(#000,transparent)}' + decorative, 'page.css')
+        self.assertEqual(code, 2)
+        self.assertIn('overgradient (4 gradients)', err)
+
+    def test_soft_repeating_gradients_and_unrelated_thin_rules_still_count(self):
+        css = '.line{height:3px}' + ' '.join(f'.hero{i} {{background:repeating-linear-gradient(red 0px,blue 10px)}}' for i in range(4))
+        code, err = run(css, 'page.css')
+        self.assertEqual(code, 2)
+        self.assertIn('overgradient (4 gradients)', err)
+
     def test_report_builders_pass(self):
         for rel in ("skills/engineering/qa-review/scripts/build-report.mjs", "skills/engineering/product-review/scripts/build-review.mjs"):
             with self.subTest(rel):
