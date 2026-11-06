@@ -23,11 +23,8 @@ BLOCKS = [
     ("generic shadow", ".card{box-shadow:0 1px 3px rgba(0,0,0,0.1)}"),
     ("hairline", ".card{border:1px solid rgba(0,0,0,.05)}"),
     ("blur blob", ".blob{filter:blur(40px)}"),
-    ("drop shadow", ".x{filter:drop-shadow(0 0 2px #000)}"),
     ("inter", "body{font-family:Inter,sans-serif}"),
     ("lucide", '<i data-lucide="check"></i>'),
-    ("heading bar", "h2{border-bottom:2px solid #000}"),
-    ("hr", "<p>a</p><hr><p>b</p>"),
     ("eyebrow class", '<p class="eyebrow">The problem</p><h2>Payroll runs late</h2>'),
     ("eyebrow class jsx", '<span className="hero-kicker">New</span>'),
     ("eyebrow css", ".eyebrow { font-size: 12px; }"),
@@ -90,6 +87,25 @@ PASSES = [
     ("tw left padding only", '<div className="border-l pl-4">quote</div>'),
     ("bare post number", '<span class="post-num">01</span><h3 class="post-title">think in context</h3>'),
 ]
+
+
+HOUSE_BLOCKS = [
+    ("drop shadow", ".x{filter:drop-shadow(0 0 2px #000)}"),
+    ("heading bar", "h2{border-bottom:2px solid #000}"),
+    ("hr", "<p>a</p><hr><p>b</p>"),
+]
+
+
+class HouseRules(unittest.TestCase):
+    def test_house_blocks_only_with_house_on(self):
+        for name, text in HOUSE_BLOCKS:
+            with self.subTest(name):
+                self.assertEqual(run(text)[0], 0, f"{name!r} should pass on a shared install")
+                os.environ["DESLOP_HOUSE"] = "1"
+                try:
+                    self.assertEqual(run(text)[0], 2, f"{name!r} should block with house rules")
+                finally:
+                    os.environ.pop("DESLOP_HOUSE", None)
 
 
 class DesignHook(unittest.TestCase):

@@ -17,7 +17,15 @@ def run(content, path="draft.md", tool="Write"):
 
 
 BLOCKS = [
+    ("not just X comma it's Y", "It's not just a tool, it's a revolution."),
+    ("isn't just X", "This isn't just a tool. It's a whole new way to work."),
+    ("delve into", "Let's delve into the numbers."),
+    ("tapestry", "A rich tapestry of options."),
     ("two-word fragments in paragraph", "<p>A degree. A desk. A career.</p>"),
+    ("not buying X buying Y", "You're not buying software, you're buying time back."),
+    ("everyone chasing few earning", "Everyone's chasing followers, few are earning trust."),
+    ("nobody's saying", "The thing nobody's saying out loud about pricing."),
+    ("point AI at", "Point AI at your inbox and watch it go."),
 
     ("ease tag once", "Sign in with your app password, once."),
     ("ease tag straight in", "Your account is linked, straight in."),
@@ -46,7 +54,6 @@ BLOCKS = [
     ("em dash", "The report is done — mostly."),
     ("curly quote", "He said “fine” and left."),
     ("middot", "Jan · Jul · Dec"),
-    ("title case heading", "# The Art Of The Deal"),
     ("heading with banned phrase", "# Unlock the power of skills"),
     ("explainer heading", "# The margin gap, and why it matters"),
     ("comma in short headline", "# One login, every tool"),
@@ -92,6 +99,8 @@ BLOCKS = [
 ]
 
 PASSES = [
+    ("point a camera at", "We point the camera at the bay every morning."),
+    ("everyone waiting few failing", "Everyone is waiting for the build, few tests are failing."),
     ("plain report", "The report lists every flow that ran. Three failed on login. Fix the selector and rerun."),
     ("parallel bullets", "- Sprint planning on Aug 20 covered the invite flow\n- Sprint review on Aug 22 covered the invite flow"),
     ("label colon line", "**Pending:** the signed SOW from the client."),
@@ -200,7 +209,46 @@ def run_send(tool, tool_input):
     return p.returncode, p.stderr
 
 
-class SendGate(unittest.TestCase):
+class House:
+    """Runs a test class with house rules on (DESLOP_HOUSE=1)."""
+
+    def setUp(self):
+        os.environ["DESLOP_HOUSE"] = "1"
+
+    def tearDown(self):
+        os.environ.pop("DESLOP_HOUSE", None)
+
+
+HOUSE_BLOCKS = [
+    ("title case heading", "# The Art Of The Deal"),
+    ("british spelling", "We will organise the launch."),
+    ("location pitch", "A small team in Cebu builds it."),
+]
+
+
+class HouseRules(House, unittest.TestCase):
+    def test_house_blocks(self):
+        for name, text in HOUSE_BLOCKS:
+            with self.subTest(name):
+                self.assertEqual(run(text)[0], 2, name)
+
+
+class SharedInstall(unittest.TestCase):
+    """Without house rules, one author's taste stays out of everyone else's drafts."""
+
+    def test_house_only_checks_pass(self):
+        for name, text in HOUSE_BLOCKS:
+            with self.subTest(name):
+                code, err = run(text)
+                self.assertEqual(code, 0, f"{name!r} should pass without house rules; stderr: {err}")
+        self.assertEqual(run_send("mcp__x__outlook_send_mail", {"to": "a@b.com", "subject": "s", "body": "A robust plan."})[0], 0)
+
+    def test_obvious_tells_still_block(self):
+        self.assertEqual(run("It's not just a tool, it's a revolution.")[0], 2)
+        self.assertEqual(run_send("mcp__discord__discord_send", {"message": "coming over — will ping"})[0], 2)
+
+
+class SendGate(House, unittest.TestCase):
     """Email, ticket, and chat sends never touch a file; the hook gates them by payload."""
 
     def test_chat_blocks_tells(self):

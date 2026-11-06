@@ -18,6 +18,9 @@ import json
 import os
 import re
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from house import HOUSE  # noqa: E402
 try: __import__('sys').path.insert(0, __import__('os').path.expanduser('~/.claude/hooks')); __import__('hooklog').install('design_slop')  # fire log for the experiments (10-26)
 except Exception: pass
 
@@ -52,16 +55,12 @@ TELLS = [
      "ultra-faint hairline card border (rgba alpha <= .08) - the invisible AI card outline"),
     (r"(?i)filter\s*:\s*blur\(\s*[2-9]\dpx",
      "decorative blur blob (filter: blur >= 20px) - AI background decoration; delete it"),
-    (r"(?i)filter\s*:\s*drop-shadow",
-     "drop-shadow filter - AI-default depth; use a real, brand-derived shadow or none"),
     (r"(?i)font-family\s*:[^;{}]*\b(?:Inter|Geist|Space\s+Grotesk)\b",
      "Inter / Geist / Space Grotesk - the default AI UI typefaces; choose type with intent"),
     (r"(?i)\blucide(?:-react|-icons?)?\b|data-lucide",
      "Lucide icons - the default AI icon set; pick icons that fit the brand"),
     (r'(?i)class(?:Name)?\s*=\s*["\'][^"\']*\b(?:terminal|code-window|window-dots|traffic-lights?)\b',
      "fake terminal-window mockup - an overused AI landing-page prop"),
-    (r"(?is)\bh[1-6]\s*(?:,[^{}]*)?\{[^{}]*border-bottom\s*:",
-     "bar line under a heading (h1-h6 with border-bottom) - the AI section-divider rule; let the heading's weight and spacing carry it, no underline bar"),
     (r"(?i)#(?:4f46e5|4338ca|5b21b6|3730a3)\b",
      "AI indigo (#4f46e5 / #4338ca) - Tailwind's default button color, the reason AI sites lean purple; choose a color with brand intent"),
     (r"(?i)\bfrom-(?:purple|violet|indigo|fuchsia)-\d{2,3}\b|\b(?:via|to)-(?:purple|violet|indigo|fuchsia)-\d{2,3}\b",
@@ -78,9 +77,19 @@ TELLS = [
      "decorative blur blob or halo (blur-3xl) - AI background decoration; delete it"),
     (r"(?i)\b(?:supercharge|turbocharge|unleash|revolutioni[sz]e|game[- ]chang(?:er|ing)|elevate your)\b",
      "AI launch-page copy ('supercharge your workflow') - say what it does in plain words"),
+]
+
+# House rules: the author's taste, not tells a stranger would spot. On only with house.HOUSE.
+HOUSE_TELLS = [
+    (r"(?i)filter\s*:\s*drop-shadow",
+     "drop-shadow filter - AI-default depth; use a real, brand-derived shadow or none"),
+    (r"(?is)\bh[1-6]\s*(?:,[^{}]*)?\{[^{}]*border-bottom\s*:",
+     "bar line under a heading (h1-h6 with border-bottom) - the AI section-divider rule; let the heading's weight and spacing carry it, no underline bar"),
     (r"(?i)<hr\b(?![^>]*\brole\s*=\s*[\"']?separator)",
      "decorative <hr> rule - AI section-divider furniture; use whitespace and heading hierarchy instead of a bar"),
 ]
+if HOUSE:
+    TELLS += HOUSE_TELLS
 
 
 # Eyebrow / kicker: a short label line stuck above a heading. Matched narrowly so
@@ -113,7 +122,7 @@ def eyebrow(content):
 
 
 # Tells from Impeccable's slop catalog (impeccable.style/slop) and Ridd's portfolio reviews,
-# added 11-02 after his saved reels. Each needs two signals together so ordinary markup passes:
+# added 11-02 after a batch of saved reels. Each needs two signals together so ordinary markup passes:
 # a skeleton loader may pulse, a stats page may say 10M, a docs page may number its steps.
 ANNOUNCE_PILL = re.compile(
     r"(?is)<(span|div|a|p|button)\b[^>]*class(?:Name)?\s*=\s*[\"'{`][^>]*?\b(?:pill|badge|chip|rounded-full)\b[^>]*>"

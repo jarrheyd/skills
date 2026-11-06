@@ -18,15 +18,21 @@ Two hooks run on every Write, Edit and MultiEdit, one on artifacts. Every hit bl
 - `hooks/copy_slop_hook.py` reads prose files (`.md`, `.mdx`, `.txt`, `.html`) and the string literals of `.ts`, `.tsx`, `.js`, `.jsx`, `.py`.
 - `hooks/design_slop_hook.py` reads `.html`, `.css`, `.scss`, `.tsx`, `.jsx`, `.vue`, `.svelte`.
 - `hooks/artifact_slop_hook.py` pulls the body out of an `Artifact` publish or a Drive connector `create_file` / `update_file` and runs both hooks on it. Those writes never touch the local filesystem, so without it they skip the gate.
-- `hooks/copy_slop_hook.py` also gates sends that never touch a file: email drafts and bodies, ticket and wiki comments, and chat-app messages (Discord, Telegram, Teams, iMessage). Chat gets a tells-only subset, since chat voice is lowercase and fragmented and the prose-shape checks misfire on it; email and comments get the full prose set. His named banned words block on the first occurrence here, since the density thresholds never trip on a short message. Wire it on the send tools in `settings.json`.
+- `hooks/copy_slop_hook.py` also gates sends that never touch a file: email drafts and bodies, ticket and wiki comments, and chat-app messages (Discord, Telegram, Teams, iMessage). Chat gets a tells-only subset, since chat voice is lowercase and fragmented and the prose-shape checks misfire on it; email and comments get the full prose set. Wire it on the send tools in `settings.json`.
 - `hooks/bash_doc_gate.py` runs on Bash. A deck or Doc built by a script and pushed over REST never passes a Write hook, so it blocks a Slides, Docs or Drive write (batchUpdate, upload, POST/PATCH/PUT, a `push*.py` or `push*.mjs` script) unless `scripts/deslop_check.py` passed on a document in the last 45 minutes. It also runs the prose checks on a heredoc that writes a `.md`, `.txt` or `.html`.
 - `scripts/deslop_check.py FILE...` checks any file from the command line (`.html` has its tags stripped, source files give their strings). `--chat -` reads a chat draft from stdin; wire it into whatever saves drafts. A document pass writes the stamp the Bash gate reads; a chat pass does not.
 
 Bypass a session with `DISABLE_ANTI_SLOP_HOOK=1`. Exempt paths that repeat by design (ledgers, generated output, a vault's state files) with `DESLOP_SKIP_PATHS=_archive/,build/`. Hooks load at session start; a hook added mid-session protects the next session.
 
+## House rules (off by default)
+
+The default checks catch tells any reader would spot. One author's own taste (a spelling standard, banned words, a house font, voice notes) lives apart, in `$DESLOP_DATA/house-rules.md` (default `~/.claude/deslop-data`, outside this repo). When that file exists, or `DESLOP_HOUSE=1`, the hooks add the house checks: American spelling, Title Case headings, the named hard-ban words on sends, location pitches and paperwork lines, `<hr>`, heading underlines, `drop-shadow`, and Arial in `doc_audit.py`. Read the file, if present, before any review or rewrite, and apply it on top of this skill.
+
+No house file yet: before the first rewrite or draft written as a person, build their voice from their own writing (recent chats, sent mail, documents they wrote themselves, lines they corrected) and save it there. Steps in `references/build-a-voice.md`. Never fall back on another author's voice.
+
 Manual: `/deslop` or "run a slop check on this". For a full review use `agents/slop-detector.md`; for a rewrite use `agents/copy-humanizer.md`.
 
-The hook is the floor, never the whole job. A hook cannot see chat replies, and it cannot tell whether a draft sounds like the author. So before anything goes external, sample the author's last sends in the target channel, shape the draft to match, then run the manual review. A draft that clears the hook but does not sound like him still needs the rewrite.
+The hook is the floor, never the whole job. A hook cannot see chat replies, and it cannot tell whether a draft sounds like the author. So before anything goes external, sample the author's last sends in the target channel, shape the draft to match, then run the manual review. A draft that clears the hook but does not sound like the author still needs the rewrite.
 
 ## What the copy hook blocks
 
@@ -60,32 +66,27 @@ Judgment-only visual tells (bento grids, three feature cards, fake testimonials,
 
 ## Tells learned from draft-versus-sent comparisons
 
-Patterns caught by comparing AI drafts with what a person actually sent in the same thread. They outrank the generic lists when writing in someone's voice or for their review.
+Patterns caught by comparing AI drafts with what a person actually sent in the same thread.
 
 1. Em dashes are banned outright, not at a density. The inline separator is a plain hyphen.
-2. Over-committing. A draft said "locked" where the sender wrote "proposing". Never commit the author harder than the verified facts: cover what is agreed, ask the clarifying question, never blanket-approve money or scope.
-3. Sectioned essays where numbered questions suffice. Real pushback is two or three numbered questions. Headers, when an email truly needs them, are bold sentence case.
-4. Compression that drops substance. The unit of cutting is the word, never the point. Half the words, all the points; a cut that removes a point is a loss.
-5. Promise language versus act language. "I'll loop in the team" is a promise; "I have informed the team" is an act. Act first, then reference the act.
-6. Doom warnings and public assignments in client chat. Open questions and offers, not directives naming who must do what in front of the client.
-7. Report verbosity. For a busy reader: fragments over grammar, no preamble, the outcome first. Repeating the ask back is padding.
-8. Duplicate artifacts. Revising by creating a second file and leaving the first is a slop workflow. Revise in place.
-9. Fake completion language. "Done", "created", "sent" without a tool having run. No tool response, it did not happen.
-10. Bold-lead paragraphs. A bold fragment as a pseudo-title, then body prose in the same paragraph. Drop the bold; write the sentence.
-11. Middots as connective tissue. Use a word, a comma, or a line break.
-12. Slide furniture. Page-number dots, upper-right kickers, per-slide section titles. Let the headline carry the point.
-13. Over-titling. A label that repeats the headline, a footer descriptor repeated on every frame, a credit line stated twice.
-14. Bar lines under headings, in CSS or as the rule a heading border becomes in a converted Google Doc. Weight and whitespace mark the section.
-15. Explainer furniture. A heading that glosses the artifact instead of naming the subject, and a footer caption that re-explains the slide above it.
-16. Unranked points in an argument. An inventory (a sweep, a ledger, a roll-up) is exhaustive and flat by design. A thesis document (memo, proposal, decision doc) that reads flat has not found its argument: surface the three points that carry the decision, demote the rest.
+2. Over-committing. A draft said "locked" where the sender wrote "proposing". Never commit the author harder than the verified facts.
+3. Compression that drops substance. The unit of cutting is the word, never the point.
+4. Promise language versus act language. "I'll loop in the team" is a promise; "I have informed the team" is an act.
+5. Duplicate artifacts. Revising by creating a second file and leaving the first is a slop workflow. Revise in place.
+6. Fake completion language. "Done", "created", "sent" without a tool having run. No tool response, it did not happen.
+7. Bold-lead paragraphs. A bold fragment as a pseudo-title, then body prose in the same paragraph. Drop the bold; write the sentence.
+8. Middots as connective tissue. Use a word, a comma, or a line break.
+9. Slide furniture. Page-number dots, upper-right kickers, per-slide section titles. Let the headline carry the point.
+10. Over-titling. A label that repeats the headline, a footer descriptor repeated on every frame, a credit line stated twice.
+11. Explainer furniture. A heading that glosses the artifact instead of naming the subject, and a footer caption that re-explains the slide above it.
+12. Unranked points in an argument. An inventory (a sweep, a ledger, a roll-up) is exhaustive and flat by design. A thesis document (memo, proposal, decision doc) that reads flat has not found its argument: surface the three points that carry the decision, demote the rest.
 
-17. An interface that explains itself. A subtitle under every heading, a greeting plus a welcome paragraph, a helper line under every button, numbered steps for a two-tap flow, a caption restating the chart, a disclaimer nobody asked for, a dashed note box telling the viewer what the screen is. Apps people use daily carry almost none of it. Show, do not tell. Run the deletion test in tell 18 on every visible string.
+13. An interface that explains itself. A subtitle under every heading, a greeting plus a welcome paragraph, a helper line under every button, numbered steps for a two-tap flow, a caption restating the chart, a disclaimer nobody asked for, a dashed note box telling the viewer what the screen is. Apps people use daily carry almost none of it. Show, do not tell. Run the deletion test in the next tell on every visible string.
 
-18. Over-explanation, anywhere. His most repeated correction (42 flagged cases, July to October 2026, listed in `references/copy-slop-dictionary.md` under "Cases he flagged"). It shows up as: reassurance and disclaimers in UI, subtitles and helper lines, rationale riders on approvals, the reasoning written into a chat or a report, captions restating a visual, step lists for trivial flows, labels restating the title, internal or presenter text leaking into client-facing screens, jargon that then needs a gloss, and a preamble saying who asked for the doc or what it covers.
+14. Over-explanation, anywhere. The most repeated correction (42 flagged cases, listed in `references/copy-slop-dictionary.md` under "Flagged cases"). It shows up as: reassurance and disclaimers in UI, subtitles and helper lines, rationale riders on approvals, captions restating a visual, step lists for trivial flows, labels restating the title, internal or presenter text leaking into client-facing screens, jargon that then needs a gloss, and a preamble saying who asked for the doc or what it covers.
    - The deletion test: delete the line. If the reader still understands, still decides, or still finishes the task, it stays deleted. Apply it to every visible string and every sentence, not only the ones that look like filler.
-   - What survives: labels, values, units, dates and "as of" stamps, errors that say what to do next, legal lines a regulator requires, and one short line before an action that cannot be undone. In a draft, the decision or the ask, and nothing that explains why unless he asked why.
+   - What survives: labels, values, units, dates and "as of" stamps, errors that say what to do next, legal lines a regulator requires, and one short line before an action that cannot be undone. In a draft, the decision or the ask, and nothing that explains why unless the reader asked why.
    - Demos: scaffolding appears only where a viewer would otherwise be stuck (a code they must type, a password they must use). Never as reassurance. "No money moves", "Nothing you enter is sent", "This is a sample flow" all go. One demo marker per app at most, such as a quiet "Sample data" in the footer, never a box per screen.
-   - Drafts as him: a yes is the bare yes. No line clearing the company, no theory of the cause, no mention of what the reader can already see in the attachment or the thread.
 
 ## Less is more
 
@@ -105,7 +106,7 @@ Before presenting a feature, a document, a design, copy, or UI:
 
 1. Sweep the user-facing surfaces: copy, docs, UI choices, generated designs, commit-adjacent prose.
 2. Apply the five questions below, the tells above, and the relevant reference file.
-3. Cut to roughly half the words while keeping every point, silently. Present only the cut version; never show a before-and-after or mention the cut.
+3. Cut every word that carries no point. Present only the cut version.
 4. Any UI: run the less-is-more pass. Delete eyebrows, badges and decoration that carry no information, and cut motion on anything that fires often. Then read every visible string on every screen and delete the ones that explain, instruct, reassure or justify, demo notes included. See tells 17 and 18 and the interface-copy section of `references/copy-slop-dictionary.md`.
 5. Client-facing, published, or written in someone's voice: run the slop-detector agent.
 6. Fix what it finds, then present. Never present with a "might be sloppy" caveat.
@@ -136,7 +137,7 @@ The 2026 Economist study found the modern machine tell is what AI leaves out: lo
 
 ## Keeping it current
 
-Every line a reader flags as slop becomes a regression case. `scripts/deslop_check.py --learn "<line>" --why "<their words>"` appends it to `flagged.txt` in the data folder (`$DESLOP_DATA`, default `~/.claude/deslop-data`; it holds the author's own messages, so it lives outside this repo). `scripts/regress.py` then fails until a check blocks every flagged line, and also fails when a check blocks any message in `his-sends-sample.txt`, the author's real sends. Run it after every change to a hook. Schedule both on a recurring check so a complaint never has to be made twice.
+Every line a reader flags as slop becomes a regression case. `scripts/deslop_check.py --learn "<line>" --why "<their words>"` appends it to `flagged.txt` in the data folder (`$DESLOP_DATA`, default `~/.claude/deslop-data`; it holds the author's own messages, so it lives outside this repo). `scripts/regress.py` then fails until a check blocks every flagged line, and also fails when a check blocks any message in `his-sends-sample.txt`, the author's real sends (filename kept for existing installs). Run it after every change to a hook. Schedule both on a recurring check so a complaint never has to be made twice.
 
 ## References
 
@@ -157,6 +158,7 @@ Every line a reader flags as slop becomes a regression case. `scripts/deslop_che
 | `references/copy-slop-dictionary.md` | Full copy catalog, including judgment tells the hook cannot regex |
 | `references/design-slop-patterns.md` | Visual and slide tells |
 | `references/what-humans-do.md` | What to do instead |
+| `references/build-a-voice.md` | Build a voice profile from the person's own writing when none exists |
 | `references/image-slop-tells.md`, `social-slop-patterns.md`, `video-slop-tells.md`, `website-slop-formula.md` | Secondary catalogs by medium |
 | `agents/slop-detector.md` | Audit agent: score, violations, top fixes |
 | `agents/copy-humanizer.md` | Rewrite agent: strip tells, then add voice |

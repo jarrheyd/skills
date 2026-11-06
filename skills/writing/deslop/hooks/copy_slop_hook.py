@@ -18,7 +18,8 @@ import sys
 try: __import__('sys').path.insert(0, __import__('os').path.expanduser('~/.claude/hooks')); __import__('hooklog').install('copy_slop')  # fire log for the experiments (10-26)
 except Exception: pass
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from shape_tells import check_shape_tells  # sentence-pair tells he flagged 10-29
+from shape_tells import check_shape_tells  # sentence-pair tells flagged 10-29
+from house import HOUSE  # the author's own taste; off on a shared install
 # File patterns to check
 PROSE_EXTENSIONS = {".md", ".mdx", ".txt", ".html", ".htm"}
 
@@ -69,6 +70,11 @@ BANNED_PHRASES = [
 
     # The "Not X, but Y" family
     (r"(?i)(?:it'?s|this\s+is)\s+not\s+just\s+\w+[^.]{0,40}\.\s*(?:it'?s|this\s+is)\s+", "banned pattern: 'It's not just X. It's Y.' - the #1 AI tell. Rewrite as a direct statement"),
+    # the same reframe joined by a comma, or opened with "isn't just" (11-06: "It's not just a tool, it's a revolution" passed)
+    (r"(?i)\b(?:(?:it'?s|this\s+is|that'?s|it\s+is)\s+not|isn'?t|aren'?t)\s+just\s+[^.!?\n]{1,40}?[,;.]\s*(?:it'?s|it\s+is|this\s+is|they'?re)\s+", "banned pattern: 'It's not just X, it's Y' - the #1 AI tell. Rewrite as a direct statement"),
+    # two words no person reaches for in a short message, so they block without a density count
+    (r"(?i)\bdelv(?:e|es|ing)\s+(?:into|deeper)\b", "AI word: 'delve into' - say 'look at' or name what you checked"),
+    (r"(?i)\btapestry\b", "AI word: 'tapestry' - name the actual things"),
     (r"(?i)not\s+just\s+about\s+\w+[^-]*\s*-\s*it'?s\s+about", "banned pattern: 'not just about X - it's about Y' - AI reframe structure"),
     # 'not only X but also Y' - flagged by The Economist's 2026 study as a device
     # the models reach for. Needs both halves inside one sentence, so plain "not
@@ -166,6 +172,14 @@ BANNED_PHRASES = [
     (r"(?i)\b(?:is|are|was|were)\s+not\s+(?:\w+ing\s+)?\w+(?:\s+\w+){0,4},\s+(?:it'?s|they'?re|but)\s+(?:\w+ing\s+)?\w+|\b(?:isn'?t|aren'?t)\s+(?:about\s+)?\w+(?:\s+\w+){0,4},\s+(?:it'?s|they'?re|but)\s+",
      "philosophical reduction: 'X is not Y, it's Z' - the not-X-but-Y reframe in a lab coat; state the claim plainly"),
     (r"(?i)\bno\s+\w+(?:\s+\w+)?,\s+no\s+\w+(?:\s+\w+)?[,.]\s*(?:just|only)\s+\w+", "'no X, no Y, just Z' - a slogan shape; write the sentence"),
+    # From the 11-02 reels (taylaburrell, showit, aj.on.ai)
+    (r"(?i)\b(?:nobody|no\s+one)'?s\s+(?:saying|talking\s+about|telling\s+you|mentioning)\b",
+     "revelation hook: 'what nobody's saying' - name the fact, skip the conspiracy"),
+    (r"(?i)\byou'?re\s+not\s+(?:buying|paying\s+for|getting|selling)\s+\w+(?:\s+\w+){0,4}[,;.]\s*you'?re\s+(?:buying|paying\s+for|getting|selling)\b",
+     "big contrast: 'you're not buying X, you're buying Y' - say what they get"),
+    (r"(?i)\b(?:everyone|everybody|most\s+people)(?:'?s|\s+is|\s+are)\s+\w+ing\s+\w+(?:\s+\w+){0,3}[,;.]\s*(?:few|nobody|no\s+one|only\s+a\s+few)\s+(?:are|is)?\s*\w+ing\b",
+     "great reframe: 'everyone's chasing X, few are earning Y' - make the claim with a fact"),
+    (r"(?i)\bpoint\s+(?:ai|claude|chatgpt|gpt|an?\s+agent|the\s+agent)\s+at\b", "AI-guru phrase: 'point AI at X' - say what it does to X"),
 
     # Thought-leadership tells (2026-10-26). His essay draft passed every check above and still
     # read machine-made; these are the moves it leaned on. See copy-slop-dictionary.md.
@@ -499,6 +513,10 @@ def extract_string_literals(content, file_path=""):
         markup = re.sub(r"<(script|style|pre|code)\b[^>]*>.*?</\1\s*>", "", content, flags=re.I | re.S)
         found.extend(re.findall(r">([^<>{}]+)<", markup))
     strings = [s for s in found if s and len(s) > 20 and " " in s.strip()]
+    # A middot between JSX values ('{month} · {issue}') or in join(" · ") is visible copy that the
+    # scans above skip, being short or outside quotes (11-05, The Current: "still a lot of AI tells like '·'").
+    code = _strip_c_comments(content) if os.path.splitext(file_path or "")[1].lower() in C_LIKE else content
+    strings += [ln.strip() for ln in code.splitlines() if re.search(r"\s·\s", ln)]
     return "\n\n".join(strings)
 
 
@@ -519,8 +537,8 @@ BANNED_PHRASES += [
 ]
 
 
-# His spelling is American by default (his note 10-27 on the Flex slides: "we seem to use british
-# spelling like practise -- across all my documents"). Lowercase word starts only, so a proper noun
+# House rule: American spelling (an author note 10-27 on a deck: "we seem to use british spelling like
+# practise -- across all my documents"). British spelling is no AI tell, so it runs only with HOUSE. Lowercase word starts only, so a proper noun
 # such as a client's "Organisation" name in a quote is left alone; a URL or path is skipped too.
 BRITISH_SPELLINGS = [
     ("practis", "practic"), ("colour", "color"), ("favour", "favor"), ("behaviour", "behavior"),
@@ -542,15 +560,17 @@ _BRIT_FIX = dict(BRITISH_SPELLINGS)
 
 
 def check_british_spelling(content):
-    """American spelling by default. Returns list of (line_num, message)."""
+    """American spelling, house rule only. Returns list of (line_num, message)."""
     out = []
+    if not HOUSE:
+        return out
     for i, line in enumerate(content.split("\n"), 1):
         for m in _BRIT_RE.finditer(line):
             word = re.match(r"[a-z]+", line[m.start():]).group(0)
             if _BRIT_OK.match(word) or "://" in line[max(0, m.start() - 60):m.start()]:
                 continue
             us = _BRIT_FIX[m.group(1)] + word[len(m.group(1)):]
-            out.append((i, f"[BLOCK] British spelling '{word}': he writes American, use '{us}'"))
+            out.append((i, f"[BLOCK] British spelling '{word}': house spelling is American, use '{us}'"))
             break
     return out
 
@@ -637,8 +657,11 @@ def check_curly_quotes(content):
 
 
 def check_title_case_headings(content):
-    """BLOCK: a markdown heading in Title Case (a small word Capitalized mid-heading)."""
+    """BLOCK: a markdown heading in Title Case (a small word Capitalized mid-heading). House rule:
+    plenty of style guides use Title Case, so it is no AI tell on its own."""
     violations = []
+    if not HOUSE:
+        return violations
     for i, line in enumerate(content.split("\n"), 1):
         m = re.match(r"^\s*#{1,6}\s+(.+)", line)
         if not m:
@@ -772,7 +795,9 @@ def check_stacked_short_sentences(content):
     violations = []
     cleaned = _strip_code_and_tables(content)
     for para in re.split(r"\n\s*\n", cleaned):
-        p = para.strip()
+        # numbered heading lines (a contents list: "1. Introduction", "1.1. Proposal scope") are
+        # labels, not sentences; they bounced a client doc 12 rounds on 11-02
+        p = "\n".join(ln for ln in para.split("\n") if not re.fullmatch(r"\s*\d+(\.\d+)*\.?\s+[^.!?]{1,60}", ln)).strip()
         if not p or p.startswith(("#", "-", "*", "`", "|", ">")):
             continue
         sents = [sn for sn in _split_sentences(p) if sn.split()]
@@ -1083,7 +1108,8 @@ def _strip_code_and_tables(content):
 
 
 def _split_sentences(text):
-    parts = re.split(r"(?<=[.!?])\s+", text.strip())
+    # titles like "Dr." end no sentence: "Dr. Cruz and Dr. Reyes" split in two and tripped the marching check (11-04)
+    parts = re.split(r"(?<!\b(?:Mr|Ms|Dr|St|vs)\.)(?<!\bMrs\.)(?<=[.!?])\s+", text.strip())
     return [p.strip() for p in parts if p.strip()]
 
 
@@ -1146,7 +1172,7 @@ def check_restatement(content):
 # A send never touches a local file, so the file checks above never see it. These tools
 # carry the body in their own argument. Classify by the tool name and the payload shape,
 # pull the body, and run the right depth of check:
-#   chat  -> tells only. His chat voice is lowercase and fragmented; the prose-shape
+#   chat  -> tells only. Chat voice is lowercase and fragmented; the prose-shape
 #            checks (title case, bold lead, uniform sentences, density) false-positive on it.
 #   prose -> full set. Email bodies and ticket comments are real prose.
 
@@ -1265,7 +1291,7 @@ def extract_send_body(tool_input, include_subject=False):
     return "\n".join(p for p in parts if p).strip()
 
 
-# His named hard-ban words (global CLAUDE.md). They are density-flagged elsewhere, which
+# House rule: the author's named hard-ban words. They are density-flagged elsewhere, which
 # never trips on a short send, so on the send path they block on the first occurrence.
 SEND_HARD_BAN = ("comprehensive", "robust", "detailed", "cutting-edge", "cutting edge",
                  "innovative", "synergy", "whack-a-mole", "whack a mole")
@@ -1273,6 +1299,8 @@ SEND_HARD_BAN = ("comprehensive", "robust", "detailed", "cutting-edge", "cutting
 
 def check_hard_ban(body):
     out = []
+    if not HOUSE:
+        return out
     low = body.lower()
     for w in SEND_HARD_BAN:
         if re.search(r"(?<![\w-])" + re.escape(w) + r"(?![\w-])", low):
@@ -1330,8 +1358,8 @@ def main():
                 parts.append(f"  {msg}")
             if len(blocks) > 8:
                 parts.append(f"\n  ... and {len(blocks) - 8} more.")
-            parts.append("\nRewrite without these AI patterns before it sends. Then match his voice: "
-                         "sample his last sends in this channel and mirror their shape.")
+            parts.append("\nRewrite without these AI patterns before it sends. Then match the author's voice: "
+                         "read their last sends in this channel and mirror their shape.")
             print("\n".join(parts), file=sys.stderr)
             sys.exit(2)
         sys.exit(0)
