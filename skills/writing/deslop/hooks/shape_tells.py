@@ -9,6 +9,8 @@ $DESLOP_DATA): run scripts/regress.py after any change.
 
 import re
 
+from house import HOUSE
+
 NEG = re.compile(r"(?i)\b(?:doesn'?t|don'?t|isn'?t|aren'?t|wasn'?t|won'?t|can'?t|not|never|no longer)\b")
 PRONOUN_START = re.compile(r"(?i)^(?:it|they|this|that|he|she|we|it'?s|they'?re|what)\b")
 STOP = {"that", "this", "with", "from", "they", "them", "their", "there", "what", "when", "have",
@@ -122,11 +124,39 @@ SELF_GRADING = re.compile(r"\b(the number that matters|the most honest)\b", re.I
 
 def check_self_grading(text):
     """'the most honest review', 'the number that matters': grading your own honesty or
-    importance reads as cheesy (his note 11-02). Say the fact and stop."""
+    importance reads as cheesy (author note 11-02). Say the fact and stop."""
     return [(text[:m.start()].count("\n") + 1, f"[BLOCK] self-grading ('{m.group(0)}') - state the fact and stop")
             for m in SELF_GRADING.finditer(text)]
 
 
+# mid-sentence "prod settings not checked yet" stays allowed: only the line label is the tell
+PAPERWORK = re.compile(r"(?im)^\s*not checked yet\s*:|\bprinted in the valley\b")
+
+
+def check_paperwork(text):
+    """A 'Not checked yet:' label in a document and a made-up colophon line: 'such an AI slop'
+    (author notes 11-02). Leave the provenance out and let the page end on its content. House rule."""
+    if not HOUSE:
+        return []
+    return [(text[:m.start()].count("\n") + 1, f"[BLOCK] paperwork line ('{m.group(0).strip()}') - cut it")
+            for m in PAPERWORK.finditer(text)]
+
+
+# "a team in Cebu", "built in Manila": where the maker sits is not the brand (author note 11-04).
+# A branding opinion, not an AI tell, so house rule only.
+LOCATION_PITCH = re.compile(r"\b(?:(?:a|our|the|small)\s+(?:team|company|studio|startup|crew)\s+(?:based\s+)?(?:in|from|out of)|(?:proudly\s+)?(?:made|built|crafted)\s+(?:with\s+love\s+)?in)\s+(?!Slack|Notion|Figma|Agos|Claude|Codex|Go\b|Rust\b|React|Next)[A-Z][a-z]+")
+
+
+def check_location_pitch(text):
+    """Selling the maker's city ("a team in Cebu"): 'why does a team in cebu matter - lol that is
+    not part of our branding' (author note 11-04). Say what the team does, not where it sits."""
+    if not HOUSE:
+        return []
+    return [(text[:m.start()].count("\n") + 1, f"[BLOCK] location pitch ('{m.group(0)}') - cut the place, say what the team does")
+            for m in LOCATION_PITCH.finditer(text)]
+
+
 def check_shape_tells(text):
     return (check_negation_flip(text) + check_mirrored_pair(text)
-            + check_fragment_run(text) + check_concede_reveal(text) + check_self_grading(text))
+            + check_fragment_run(text) + check_concede_reveal(text) + check_self_grading(text)
+            + check_paperwork(text) + check_location_pitch(text))

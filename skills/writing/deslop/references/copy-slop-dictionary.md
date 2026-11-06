@@ -437,12 +437,12 @@ A paragraph that ends on a short abstract sentence carrying no number and no pro
 Instead: delete it, or replace it with the fact it was gesturing at.
 
 ## Over-explaining the obvious (added 2026-10-12)
-His words: "i dont like words that overexplain ever. this is easily assumed. these overexplanations are such an AI tell."
+An author note: "i dont like words that overexplain ever. this is easily assumed. these overexplanations are such an AI tell."
 Disclaimers and captions that tell the reader what the context already says: "Made up for today. Not an ML plan.", "What you saw today", "When ML runs it for real", "for demo purposes", "as you can see", "not production code". Cut the line. If context is truly missing, show it with a visual, never a caption. The hook blocks the common forms; the review gate catches the rest by asking of every line: would he assume this anyway?
 
-## Cases he flagged: over-explanation (mined 2026-10-13)
+## Flagged cases: over-explanation (mined 2026-10-13)
 
-Mined from his own pushback in Claude Code transcripts (July to October 2026), the voice-learning log and memory notes. Client detail stripped. Where his fix is known, it follows the arrow. Use these as the bar: if a line looks like one of these, delete it.
+Mined from one author's pushback on AI drafts (July to October 2026). Client detail stripped. Where the fix is known, it follows the arrow. Use these as the bar: if a line looks like one of these, delete it.
 
 ### Reassurance, disclaimers and demo notes in UI
 - 2026-10-13. A dashed "Demo: a sample flow. No money moves and no order reaches the bank." box on an app screen. -> Deleted. At most one quiet "Sample data" marker per app.
@@ -467,7 +467,7 @@ Mined from his own pushback in Claude Code transcripts (July to October 2026), t
 - 2026-10-02. Story lines narrating the team's feelings and promising work "being written now". -> Cut.
 
 ### Captions, explainer headers and slide furniture
-- 2026-08-27. A slide footer re-explaining the slide, and a slide he could say aloud. -> He removed the bottom line himself and cut the slide. "I just need visuals."
+- 2026-08-27. A slide footer re-explaining the slide, and a slide the presenter could say aloud. -> The bottom line removed and the slide cut. "I just need visuals."
 - 2026-08-27. A dash at the top of slides, a header that explains the slide, a footer that explains it again. -> None of the three.
 - 2026-09-01. Doc headings like "The system, in two pictures". -> "The system".
 - 2026-09-04. A diagram brief with design notes and callouts inside the visual. -> Notes go in a message to the designer, not in the visual.
@@ -480,30 +480,14 @@ Mined from his own pushback in Claude Code transcripts (July to October 2026), t
 - 2026-07-28. A release update written like a requirements doc. -> Release-note lines showing the value.
 - 2026-09-03. A status doc with long items. -> Short items, done first, grouped by feature.
 
-### Rationale and reasoning in drafts as him
-- 2026-08-06. A 6-line WhatsApp draft explaining reasoning before the answer. -> "up to us on this one. We can default to opted out, and they can opt in."
-- 2026-08-12. A long technical chat draft. -> "IIRC - all-traffic was turned on so AI summary API worked. if we go back to private-ranges-only, would it still work?"
-- 2026-08-17. A yes with a caveat attached. -> "yes okay ra".
-- 2026-08-19. A ticket review draft that asked for extra testing and explained each point. -> "looks okay", comment only on the one open point.
-- 2026-10-04. A billing reply opening by clearing the firm and guessing the cause. -> Only the ask: "can you check admin console > billing > payment accounts?" "Dont restate the obvious."
-- 2026-08-11. A client email spelling out where a budget figure came from. -> Say the budget exists; skip the origin.
-- 2026-09-26. A bug summary listing everything found proactively. -> Her reports and why; one line for the rest.
-- 2026-09-28. "Will not roll over" in a proposal. -> Reads defensive; rephrase or drop.
-- 2026-10-06. A project-channel nudge "too long to read". -> One short send.
-- 2026-07-22. A client recap email, formal and wordy. -> "Even the NDA thing could just be one sentence."
-
 ### Jargon that then needs explaining
 - 2026-08-17. Automated ticket comments "cryptic, theoretical, too wordy". -> Plain words, one idea per sentence.
 - 2026-08-19. Questions for legal "so wordy and hard to understand". -> One plain question each.
 - 2026-08-14. Product description copy "cryptic and marketing-y". -> Objective and straightforward.
 
-### Reports to him
-- 2026-10-01 and 2026-10-02. "your responses are so wordy", "your drafts are always so long". -> Outcome first, one line per point.
-- 2026-08-17. A plan "toooooo wordy". -> Half the words, every point.
-
 ## Thought-leadership tells (added 2026-10-26)
 
-Found when his valley essay and LinkedIn drafts passed every check above and he still said they read as AI. The word-level checks were clean. What gave them away was the shape of a generated think-piece. Sources: his own drafts (the case set), Wikipedia "Signs of AI writing" (Oct 2026 revision), Hiration "AI slop on LinkedIn" (2026), magicpost.in reach study of LinkedIn tells (Apr to Sep 2026), CNN on LinkedIn's slop classifier (2026-10-18).
+Found when an essay and LinkedIn drafts passed every check above and still read as AI. The word-level checks were clean. What gave them away was the shape of a generated think-piece. Sources: his own drafts (the case set), Wikipedia "Signs of AI writing" (Oct 2026 revision), Hiration "AI slop on LinkedIn" (2026), magicpost.in reach study of LinkedIn tells (Apr to Sep 2026), CNN on LinkedIn's slop classifier (2026-10-18).
 
 ### Enforced by the hook (copy_slop_hook.py, 2026-10-26)
 - Thinker bridge. "Senge has a name for this", "Elena Verna said it well", "What helped was an old idea from Kahneman", "There's a line in...". A famous name dropped mid-post to turn a moment into a lesson. Every one of his drafts had exactly one, in the middle, as a template.
@@ -517,17 +501,11 @@ Found when his valley essay and LinkedIn drafts passed every check above and he 
 - Balanced reversal. "I got the speed, and the quality stayed flat." / "Building got cheap, and coordinating stayed expensive." The not-X-but-Y antithesis hidden behind "and".
 
 ### Judgment only (the reviewer and the routine apply these)
-- Forced parable. A small event, then an oversized lesson, with the story built backward from the takeaway (Hiration 2026). Test: would he tell this story at dinner without the lesson attached? If the story only exists to deliver the point, it is a parable.
+- Forced parable. A small event, then an oversized lesson, with the story built backward from the takeaway (Hiration 2026). Test: would the author tell this story at dinner without the lesson attached? If the story only exists to deliver the point, it is a parable.
 - The template arc. Moment, then a famous name, then the lesson, then a zoom-out to everyone, then a quiet callback to the opening image. One of these is writing. All five in order is a generator. Break the arc: drop the zoom-out, let the thinker come first, or end somewhere the opening didn't predict.
 - Callback ending. The last line returns to the first image ("walking around a little pixel valley, looking for the '!'"; "They just waited a whole day."). Clever once, a signature when it is every post.
-- Stacked statistics. "5 of 64... 168 of 239... about 13%... every 16 hours" in two sentences. Numbers used as rhetoric. Keep the one number he would actually say out loud.
-- Humility beat. A scheduled admission of uncertainty ("I don't know yet if this holds at company scale") placed where a template says humility goes. Real doubt is specific about what he doesn't know and why.
-- Everything resolved. Every paragraph has a job, nothing is left hanging, no tangent survives. His real posts wander: a Kindle on a trip, a reel from @blakeoftoday, a "(...lol)" aside about fake news. Uniform over-polish is itself the tell (Hiration 2026).
+- Stacked statistics. "5 of 64... 168 of 239... about 13%... every 16 hours" in two sentences. Numbers used as rhetoric. Keep the one number the author would actually say out loud.
+- Humility beat. A scheduled admission of uncertainty ("I don't know yet if this holds at company scale") placed where a template says humility goes. Real doubt is specific about what the author doesn't know and why.
+- Everything resolved. Every paragraph has a job, nothing is left hanging, no tangent survives. Real posts wander: a Kindle on a trip, a reel from @blakeoftoday, a "(...lol)" aside about fake news. Uniform over-polish is itself the tell (Hiration 2026).
 - Corrective framing (new mid-2026). "rather than", "does not establish", "should not be confused with". Wikipedia notes these were near unheard-of before July 2026. Fine once; a tell when it sets up the thesis.
 - No lived detail. Since 2026-07-27 LinkedIn's slop classifier pushes down posts with no concrete detail or lived experience, and posts with concrete detail gained about 21% reach (magicpost.in). Lived detail means a place, a time of day, who was there, what he actually typed, what he got wrong.
-
-### What fixes it for him
-- Build the post from his own sentences. His typed asks to his chats ("ugh i really dont like that things dont resume directly anywhere", "has speed but not quality and follow through", "i want it to replace my claude app") are the most human material available. Quote them, lowercase and typos intact.
-- Let the piece have one tangent that doesn't pay off.
-- Use his texture from fieldnotes: "Growing up,", "Ironically,", "I'm genuinely excited about it", one "lol", long gentle sentences, a slightly loose phrase ("in the speed of light"). Punchy short lines are the generator's habit, not his.
-- End where the thought actually stopped, even mid-question. No callback, no verdict.

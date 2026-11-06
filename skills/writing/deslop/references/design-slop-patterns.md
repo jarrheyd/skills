@@ -136,11 +136,14 @@ Regex-caught by `hooks/design_slop_hook.py` are marked (hook); the rest need a r
 - 3 pricing tiers as the default shape (judgment).
 - Terminal-window mockup as a hero prop (hook, best-effort).
 - Fake testimonials; no real product demos or screenshots (judgment).
+- Stock team photos and fake product shots (a generic dashboard on a laptop) in place of real people and real screens (judgment).
+- Footer and nav links that go nowhere (`href="#"`, "About" with no page behind it) (judgment).
 - Missing TOS / privacy policy / skeleton loaders on a "real" product (judgment - real products have these).
 
 **Icons, type, motion**
 - Lucide icons; Inter / Geist / Space Grotesk as the default typeface (hook).
 - Emojis and sparkle icons as decoration (judgment).
+- A white icon inside a solid colored circle, repeated per feature (judgment).
 - Checkmark-bullet lists everywhere (judgment).
 - Animated arrows, gratuitous hover animations (judgment).
 

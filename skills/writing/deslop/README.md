@@ -17,6 +17,8 @@ Three checkers and a skill:
 
 The checkers are plain Python. They read a file and exit `0` (clean) or `2` (slop found), so they work as an editor hook, a git pre-commit hook, a CI step, or a call from any agent. Every hit blocks; there is no warn tier. Bypass a run with `DISABLE_ANTI_SLOP_HOOK=1`, or exempt paths that repeat by design with `DESLOP_SKIP_PATHS=_archive/,build/`.
 
+Out of the box it catches tells any reader would spot. Your own taste (a spelling standard, banned words, a house font, voice notes) goes in `house-rules.md` in `$DESLOP_DATA` (default `~/.claude/deslop-data`). When that file exists, or `DESLOP_HOUSE=1`, the extra house checks switch on and the skill reads the file before any review. Nobody else's install picks it up.
+
 The family list of what each checker blocks is in [SKILL.md](./SKILL.md); the literal catalog with fixes is [references/copy-slop-dictionary.md](./references/copy-slop-dictionary.md) and [references/design-slop-patterns.md](./references/design-slop-patterns.md).
 
 ## Install

@@ -25,7 +25,7 @@ Report the current word count and the count after the cuts you propose.
 
 ## Over-explanation pass
 
-His most repeated correction. The cases are in `references/copy-slop-dictionary.md` under "Cases he flagged". Read every visible string and every sentence, one at a time, and delete each one that:
+The most repeated correction. The cases are in `references/copy-slop-dictionary.md` under "Flagged cases". Read every visible string and every sentence, one at a time, and delete each one that:
 
 - explains what the reader is looking at (a subtitle, a caption, a line narrating the page),
 - instructs on something the control already says (helper lines, numbered steps for a two-tap flow),

@@ -23,11 +23,8 @@ BLOCKS = [
     ("generic shadow", ".card{box-shadow:0 1px 3px rgba(0,0,0,0.1)}"),
     ("hairline", ".card{border:1px solid rgba(0,0,0,.05)}"),
     ("blur blob", ".blob{filter:blur(40px)}"),
-    ("drop shadow", ".x{filter:drop-shadow(0 0 2px #000)}"),
     ("inter", "body{font-family:Inter,sans-serif}"),
     ("lucide", '<i data-lucide="check"></i>'),
-    ("heading bar", "h2{border-bottom:2px solid #000}"),
-    ("hr", "<p>a</p><hr><p>b</p>"),
     ("eyebrow class", '<p class="eyebrow">The problem</p><h2>Payroll runs late</h2>'),
     ("eyebrow class jsx", '<span className="hero-kicker">New</span>'),
     ("eyebrow css", ".eyebrow { font-size: 12px; }"),
@@ -92,6 +89,25 @@ PASSES = [
 ]
 
 
+HOUSE_BLOCKS = [
+    ("drop shadow", ".x{filter:drop-shadow(0 0 2px #000)}"),
+    ("heading bar", "h2{border-bottom:2px solid #000}"),
+    ("hr", "<p>a</p><hr><p>b</p>"),
+]
+
+
+class HouseRules(unittest.TestCase):
+    def test_house_blocks_only_with_house_on(self):
+        for name, text in HOUSE_BLOCKS:
+            with self.subTest(name):
+                self.assertEqual(run(text)[0], 0, f"{name!r} should pass on a shared install")
+                os.environ["DESLOP_HOUSE"] = "1"
+                try:
+                    self.assertEqual(run(text)[0], 2, f"{name!r} should block with house rules")
+                finally:
+                    os.environ.pop("DESLOP_HOUSE", None)
+
+
 class DesignHook(unittest.TestCase):
     def test_blocks(self):
         for name, text in BLOCKS:
@@ -105,6 +121,31 @@ class DesignHook(unittest.TestCase):
                 path = "notes.md" if name == "non design file" else "page.html"
                 code, err = run(text, path)
                 self.assertEqual(code, 0, f"{name!r} should pass; stderr: {err}")
+
+    def test_functional_gradients_do_not_count_as_decoration(self):
+        css = """
+        .fade { mask-image: linear-gradient(#000 70%,transparent); -webkit-mask-image: linear-gradient(#000,transparent); }
+        .hatch { background: repeating-linear-gradient(135deg,color-mix(in srgb,var(--c) 30%,transparent) 0 3px,transparent 3px 7px); }
+        select { background: linear-gradient(45deg,transparent 50%,var(--ink) 50%),linear-gradient(135deg,var(--ink) 50%,transparent 50%); background-size:5px 5px; }
+        .ring { background:conic-gradient(var(--c,var(--app)) calc(var(--p)*1%),var(--sunk) 0); }
+        .progress { background:linear-gradient(90deg,var(--app) calc(var(--p) * 100%),var(--line) 0); }
+        .corner { background:linear-gradient(225deg,var(--warn) 0 6px,transparent 6px); }
+        .cost { height:3px; background:linear-gradient(90deg,var(--bad),var(--good)); }
+        """
+        code, err = run(css, 'functional.css')
+        self.assertEqual(code, 0, err)
+
+    def test_functional_gradients_do_not_hide_four_decorative_gradients(self):
+        decorative = ' '.join(f'.hero{i} {{background:linear-gradient(red,blue)}}' for i in range(4))
+        code, err = run('.mask{mask-image:linear-gradient(#000,transparent)}' + decorative, 'page.css')
+        self.assertEqual(code, 2)
+        self.assertIn('overgradient (4 gradients)', err)
+
+    def test_soft_repeating_gradients_and_unrelated_thin_rules_still_count(self):
+        css = '.line{height:3px}' + ' '.join(f'.hero{i} {{background:repeating-linear-gradient(red 0px,blue 10px)}}' for i in range(4))
+        code, err = run(css, 'page.css')
+        self.assertEqual(code, 2)
+        self.assertIn('overgradient (4 gradients)', err)
 
     def test_report_builders_pass(self):
         for rel in ("skills/engineering/qa-review/scripts/build-report.mjs", "skills/engineering/product-review/scripts/build-review.mjs"):
