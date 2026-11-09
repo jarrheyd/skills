@@ -47,6 +47,7 @@ Messages written by automation (scheduled prompts, other sessions, scripts) are 
 1. Harvest.
 2. Read every moment and keep the ones where the setup let the person down: a correction, a preference stated for the second time, a wrong assumption, a search that took ten tool calls, a tool that failed over and over, a call they declined. A plain next instruction is not a finding.
 3. Group what you kept into findings. Each finding quotes at least one moment with its session and time, and a finding you cannot trace to a moment is dropped.
+   Then name each finding's class, the kind of failure it is one case of ("a wait with no limit", "an error thrown away", "a screen that says something false", "a list that only grows"), and group findings by class. Fix the class, not the case (his 11-04: "the retros should be about fixing things systematically also"). Before fixing, search for other live cases of the same class (logs, other chats, other files) and list them: if you find none, say where you looked.
 4. For each finding, look for the rule that should have prevented it in memory files, the steering files (`CLAUDE.md`, `AGENTS.md`), the skill or routine that was running, and the hooks. There are three outcomes:
    - No rule exists, so write one in the place the routing table names.
    - A rule exists and was not followed. More prose will not help here, so turn it into a check that runs by itself, such as a hook, a lint, a test or a script step.
@@ -56,11 +57,14 @@ Messages written by automation (scheduled prompts, other sessions, scripts) are 
    - Copy the file to the backup folder first (`retro-targets.md` names it; otherwise `.retro-backups/<date>/` next to the file). In a git repo, a commit is the backup.
    - Make the smallest edit that closes the gap, and update an existing rule before adding a new one.
    - Verify it by running the tests, firing the hook on one sample that should fail and one that should pass, or syntax-checking the script. A fix that fails verification is rolled back from the backup and reported as not done.
+   - A class fix is verified twice: it catches the original moment, and it catches at least one other case of the class that it was not written for (a live one you found, or a made-up one in its test). A fix that only stops the moment you started from is a case fix: report it as not done and keep going.
+   - Every class fix leaves something that keeps checking on its own: a limit in `_meta/crews/waits.mjs`, a log the keeper reads each pass, a test, or a hook. Prose alone is not a class fix.
 7. Log one line per change in the retro log (`retro-targets.md` names it; otherwise `RETRO.md` at the repo root) with the date, the file, what changed, the moment behind it and where the backup is.
 8. Report in this order:
    - Done, with one line per change and its file.
    - Not done, for anything that failed verification, with the reason.
    - Needs you, asked through the question tool with the recommended option first. These never sit in a list for the person to notice.
+9. Grill the person on improvements, without asking first (his ask 11-04: "im so surprised i dont get any grill me for improvements"). After the report, take the two or three findings where a better design is a choice only the person can make (how a screen should feel, what a routine should do, what to stop doing) and run the grill-me skill on them: one picker per question, recommended option first, one line per option on what happens, the next question after each answer. Apply each answer the same turn and log it. Never end on "want me to grill you?". Unattended, file the same questions as one `decisions.mjs open --file` card so they wait for the person.
 
 ## What goes to the person instead of being applied
 
