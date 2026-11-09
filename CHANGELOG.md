@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.3.0
+
+### Minor Changes
+
+- [#4](https://github.com/jarrheyd/skills/pull/4) [`922b6c0`](https://github.com/jarrheyd/skills/commit/922b6c0e20debbc54057486361757dc28c16c063) Thanks [@jarrheyd](https://github.com/jarrheyd)! - Split deslop into shared checks and opt-in house rules. A plain install now catches obvious AI tells only; one author's taste (American spelling, Title Case headings, named hard-ban words on sends, location pitches, paperwork lines, `<hr>`, heading underlines, `drop-shadow`, Arial in doc audits, and voice notes) runs only when `$DESLOP_DATA/house-rules.md` exists or `DESLOP_HOUSE=1`. Also blocks the not-just-X reframe when a comma joins it, two near-certain AI words in short text, reel-derived and middot tells, and adds a guide for building a voice from the person's own writing when no profile exists.
+
+### Patch Changes
+
+- [`b841ade`](https://github.com/jarrheyd/skills/commit/b841adef78b86e0db38d56f761a18bb704927d5c) Thanks [@jarrheyd](https://github.com/jarrheyd)! - Deslop catches more tells: plain not-X-it's-Y reframes, figurative red-flag phrases, drumroll closers, sparkle icons, emoji headings, scroll-fade pileups, placeholder business info, clickable divs, an italic word in a headline, wider location pitches, and parked open-item headings.
+
+- [#4](https://github.com/jarrheyd/skills/pull/4) [`922b6c0`](https://github.com/jarrheyd/skills/commit/922b6c0e20debbc54057486361757dc28c16c063) Thanks [@jarrheyd](https://github.com/jarrheyd)! - Exclude masks, hard-stop patterns, and thin data indicators from the decorative gradient count. Keep the other design checks and the four-gradient threshold.
+
 ## 2.2.2
 
 ### Patch Changes
