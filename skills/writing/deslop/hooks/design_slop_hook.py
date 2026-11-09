@@ -160,11 +160,29 @@ def has_brand_system(fp):
             break
         d = up
     return False
+HEADLINE_ITALIC_WORD = re.compile(r"""(?is)<h[12]\b[^>]*>(?:(?!</h[12]>).){0,200}?(?:<(?:em|i)\b[^>]*>\s*[^<\s]+(?:\s+[^<\s]+)?\s*</(?:em|i)>|<span\b[^>]*class=["'][^"']*\bitalic\b[^"']*["'][^>]*>\s*[^<\s]+(?:\s+[^<\s]+)?\s*</span>)""")
+SPARKLE = re.compile(r"""✨|<Sparkles?\b|\bSparkles?Icon\b|['"]sparkles?['"]|ph-sparkle|lucide-sparkles?""")
+HEADING_EMOJI = re.compile(r"""(?s)<h[1-3]\b[^>]*>\s*(?:<[^>]+>\s*)*[\U0001F300-\U0001FAFF☀-➿]|[\U0001F300-\U0001FAFF☀-➿]\s*(?:<[^>]+>\s*)*</h[1-3]>""")
+SCROLL_FADE = re.compile(r"""whileInView|data-aos=|\bfade-(?:up|in-up)\b|animate-on-scroll|\bAOS\.init\b""")
+PLACEHOLDER_BIZ = re.compile(r"""(?i)\blorem ipsum\b|\b123 Main St|\(555\)\s?\d{3}|\b555-\d{4}\b|\b(?:hello|info|contact|you)@example\.com\b|\bAcme (?:Inc|Corp|Co)\b|\bJohn Doe\b|\bJane Doe\b""")
+CLICK_DIV = re.compile(r"""<(?:div|span)\b(?![^>]*\b(?:role|tabIndex|tabindex)=)[^>]*\bonClick=""")
 NESTED_CARD_CSS = re.compile(r"(?i)\.(card|panel|tile)(?![\w-])[^{},]*?\s\.\1(?![\w-])")
 
 
 def catalog_tells(content, fp=""):
     hits = []
+    if len(SPARKLE.findall(content)) >= 2:
+        hits.append("sparkle icons used as decoration (2+) - the AI 'magic' mark (reel DfX3LIIIvub); show what the feature does instead")
+    if HEADING_EMOJI.search(content):
+        hits.append("emoji in a heading - AI landing-page garnish (reel DfX3LIIIvub); cut it, let the words carry the heading")
+    if len(SCROLL_FADE.findall(content)) >= 6:
+        hits.append("everything fades in on scroll (6+ reveal animations) - AI motion default (reel DfX3LIIIvub); animate the one thing that needs it, let the rest just be there")
+    if PLACEHOLDER_BIZ.search(content):
+        hits.append("placeholder business info (lorem ipsum, 555 numbers, example.com, Acme, John Doe) - shipped template filler (reel DfX3LIIIvub); put the real details in or cut the block")
+    if CLICK_DIV.search(content):
+        hits.append("clickable div or span with no role or tabIndex - keyboard users cannot reach it (reel DfX3LIIIvub); use a <button> or <a>")
+    if HEADLINE_ITALIC_WORD.search(content) and not has_brand_system(fp):
+        hits.append("one italic word inside a headline - the AI 'tasteful' accent (reel DfcnAJFhAa1, fix 3); set the headline in one style, or write a DESIGN.md that says why")
     if ANNOUNCE_PILL.search(content):
         hits.append("'Introducing' pill badge over the hero - the AI launch-page opener; say the news in the headline or cut it")
     if PULSE.search(content) and STATUS_COPY.search(content):

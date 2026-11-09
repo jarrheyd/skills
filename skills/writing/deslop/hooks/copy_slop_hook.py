@@ -72,6 +72,16 @@ BANNED_PHRASES = [
     (r"(?i)(?:it'?s|this\s+is)\s+not\s+just\s+\w+[^.]{0,40}\.\s*(?:it'?s|this\s+is)\s+", "banned pattern: 'It's not just X. It's Y.' - the #1 AI tell. Rewrite as a direct statement"),
     # the same reframe joined by a comma, or opened with "isn't just" (11-06: "It's not just a tool, it's a revolution" passed)
     (r"(?i)\b(?:(?:it'?s|this\s+is|that'?s|it\s+is)\s+not|isn'?t|aren'?t)\s+just\s+[^.!?\n]{1,40}?[,;.]\s*(?:it'?s|it\s+is|this\s+is|they'?re)\s+", "banned pattern: 'It's not just X, it's Y' - the #1 AI tell. Rewrite as a direct statement"),
+    # the plain reframe without "just" (11-08 carousel DfQcCnSj3ns: "It's not a tooling problem, it's a people problem" passed)
+    (r"(?i)\b(?:(?:it'?s|that'?s|this\s+is|it\s+is|that\s+is)\s+not|isn'?t|wasn'?t)\s+(?:a|an|the|about|your|our|really)\s+[^.!?\n,;]{1,40}?[,;.]\s*(?:it'?s|it\s+is|that'?s|it\s+was|this\s+is)\s+(?:a|an|the|about|your|our|really)\s+\w", "banned pattern: 'It's not X, it's Y' - the reframe AI reaches for. Say what it is, once"),
+    (r"(?i)\bnot\s+an?\s+\w+\s+problem[.,;]\s*(?:it'?s|it\s+is|that'?s)\s+an?\s+\w+\s+problem", "banned pattern: 'not a X problem. It's a Y problem.' - name the problem directly"),
+    # figurative red-flag words (11-08 carousel DfQcCnSj3ns). Only the figurative uses block:
+    # he writes "if the NBS APIs land dec 7" and "dont land on the page", which must pass.
+    (r"(?i)\bquietly\s+(?:became|becomes|become|reshap\w*|transform\w*|chang\w*|redefin\w*|rewrit\w*|replac\w*|kill\w*|took\s+over|taking\s+over|won|winning|built|building|shift\w*|disappear\w*|revolution\w*|power\w*|runs?|running|ship\w*|launch\w*|roll\w*\s+out|dropp\w*|outgrew|overtook)\b", "AI word: 'quietly' + a big verb - say what changed and when"),
+    (r"(?i)\bunlock(?:s|ed|ing)?\s+(?:new\s+|real\s+|more\s+|hidden\s+|your\s+|the\s+next\s+)?(?:value|growth|potential|insights?|opportunit\w+|possibilit\w+|levels?|momentum|creativity|productivity|efficienc\w+|freedom|scale|impact)\b", "AI word: 'unlock' + an abstract noun - say what they can now do"),
+    (r"(?i)\b(?:is|are|was|were)\s+(?:quietly\s+|really\s+|secretly\s+)?carrying\s+(?:the\s+(?:whole|entire)\b|so\s+much\b|a\s+lot\s+of\s+(?:weight|the\s+load)|the\s+(?:weight|load|team|story|piece|argument))", "AI word: 'X is carrying the whole thing' - say what it does"),
+    (r"(?i)\b(?:didn'?t|doesn'?t|did\s+not|does\s+not|won'?t|never)\s+(?:quite\s+|really\s+)?land\b(?!\s+(?:on|in|at|by|until|before|after|today|tomorrow|this|next|dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|\d))|\blet\s+(?:that|it|this)\s+land\b|\b(?:lands?|landed|landing)\s+(?:differently|hard|harder|well|better|deeper|with\s+(?:people|readers|the\s+audience))\b", "AI word: figurative 'land' (didn't land, lands differently) - say how people reacted"),
+    (r"(?i)\b(?:small\s+\w+|tiny\s+\w+|the\s+(?:costs?|wins?|gains?|decisions?|compromises?|shortcuts?))\s+(?:quietly\s+)?(?:pile|piles|piled|piling)\s+up\b", "AI phrase: 'small X pile up' - name the thing and the number"),
     # two words no person reaches for in a short message, so they block without a density count
     (r"(?i)\bdelv(?:e|es|ing)\s+(?:into|deeper)\b", "AI word: 'delve into' - say 'look at' or name what you checked"),
     (r"(?i)\btapestry\b", "AI word: 'tapestry' - name the actual things"),
@@ -159,6 +169,11 @@ BANNED_PHRASES = [
      "unneeded justifier: 'here's the thing' / 'the truth is' / 'let's be honest' - cut the wind-up"),
     (r"(?i)\b(?:what\s+)?(?:nobody|no\s+one|no-one|they)\s+(?:tells?|talks?\s+about|says?|wants?\s+you\s+to\s+know|mentions?)\b[^.]{0,40}\b(?:you|out\s+loud|this|that)\b",
      "revelation hook: 'what nobody tells you' / 'the thing nobody says out loud' - name the fact, skip the conspiracy"),
+    (r"(?i)\b(?:the\s+part|the\s+thing|what)\s+(?:nobody|no\s+one|no-one)\s+(?:talks?\s+about|will\s+(?:say|tell\s+you|admit)|says?|admits?|mentions?)\b", "fake secret: 'the part no one talks about' / 'no one will say out loud' - state the fact"),
+    (r"(?i)\b(?:say|said|saying)\s+(?:this|it|that)?\s*out\s+loud\b", "fake secret: 'say it out loud' - drop the drumroll, say the thing"),
+    (r"(?i)(?:^|[.!:]\s+)(?:and\s+)?honestly\?", "rhetorical drumroll: 'And honestly?' - cut it, write the sentence"),
+    (r"(?i)(?:^|[.!]\s+)that'?s\s+(?:the\s+whole\s+(?:point|thing|game|trick)|the\s+point)\.\s*$", "mic-drop closer: 'That's the whole point.' - end on the last real point"),
+    (r"(?i)\bthat'?s\s+it\.\s+that'?s\s+the\s+(?:post|tweet|thread|whole\s+thing)\b", "mic-drop closer: 'That's it. That's the post.' - end on the last real point"),
     (r"(?i)\b(?:the\s+secret\s+to|the\s+one\s+thing|the\s+real\s+reason)\b", "revelation hook: 'the secret to' / 'the one thing' / 'the real reason' - just say it"),
     (r"(?i)\bwhat\s+\w+(?:\s+\w+){0,3}\s+(?:actually|really)\s+(?:is|are|means?|does|do|looks?\s+like)\b",
      "big-reveal frame: 'what X actually is' - state what it is"),

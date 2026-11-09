@@ -509,3 +509,15 @@ Found when an essay and LinkedIn drafts passed every check above and still read 
 - Everything resolved. Every paragraph has a job, nothing is left hanging, no tangent survives. Real posts wander: a Kindle on a trip, a reel from @blakeoftoday, a "(...lol)" aside about fake news. Uniform over-polish is itself the tell (Hiration 2026).
 - Corrective framing (new mid-2026). "rather than", "does not establish", "should not be confused with". Wikipedia notes these were near unheard-of before July 2026. Fine once; a tell when it sets up the thesis.
 - No lived detail. Since 2026-07-27 LinkedIn's slop classifier pushes down posts with no concrete detail or lived experience, and posts with concrete detail gained about 21% reach (magicpost.in). Lived detail means a place, a time of day, who was there, what he actually typed, what he got wrong.
+
+## Red-flag phrases (2026-11-08, carousel DfQcCnSj3ns)
+Source: the "Phrases & words that are my AI RED FLAGS" carousel. Already caught before this pass: "Here's what most people miss", "No X. No Y. Just Z.", "The best part?", "The truth?", stacked one-word fragments, "Read that again."
+
+Added to the hook:
+- The plain reframe without "just": "It's not a tooling problem, it's a people problem", "That's not a model problem. It's a context problem."
+- Fake secrets: "the part no one talks about", "no one will say out loud", "say it out loud".
+- "And honestly?" as a drumroll.
+- Mic-drop closers: "That's the whole point." at the end of a paragraph, "That's it. That's the post."
+- Figurative words only: "quietly" plus a big verb (reshaped, shipped, took over), "unlock" plus an abstract noun (value, growth), "is carrying the whole X", "didn't land" about a reaction, "small X pile up".
+
+Literal uses pass: "if the APIs land dec 7", "the PR didn't land until Friday", "tickets pile up when a teammate is out", "its not on staging yet, its on dev".

@@ -144,7 +144,9 @@ def check_paperwork(text):
 
 # "a team in Cebu", "built in Manila": where the maker sits is not the brand (author note 11-04).
 # A branding opinion, not an AI tell, so house rule only.
-LOCATION_PITCH = re.compile(r"\b(?:(?:a|our|the|small)\s+(?:team|company|studio|startup|crew)\s+(?:based\s+)?(?:in|from|out of)|(?:proudly\s+)?(?:made|built|crafted)\s+(?:with\s+love\s+)?in)\s+(?!Slack|Notion|Figma|Agos|Claude|Codex|Go\b|Rust\b|React|Next)[A-Z][a-z]+")
+# 11-09: "a software studio in Cebu" passed, since one adjective broke the match; "shipped from Cebu"
+# and "Cebu-based" passed too. "a very weird AI tell is overemphasis on location and geography".
+LOCATION_PITCH = re.compile(r"\b(?:(?:a|an|our|the|small)\s+(?:[\w-]+\s+){0,3}?(?:team|company|studio|startup|crew|agency|firm|consultancy|business|brand)\s+(?:based\s+)?(?:in|from|out of)|(?:proudly\s+)?(?:made|built|crafted|shipped|designed)\s+(?:with\s+love\s+)?(?:in|from|out of))\s+(?:the\s+)?(?!Slack|Notion|Figma|Agos|Claude|Codex|Go\b|Rust\b|React|Next|Production|Staging|Dev\b|Prod\b)[A-Z][a-z]+|\b(?!Web|Cloud|Browser|Server|Team|Agent|Text|Model)[A-Z][a-z]+-based\s+(?:team|company|studio|startup|agency|firm|brand)\b")
 
 
 def check_location_pitch(text):
@@ -156,7 +158,23 @@ def check_location_pitch(text):
             for m in LOCATION_PITCH.finditer(text)]
 
 
+# A "Still to decide" section at the end of a doc, deck or page: open calls parked for the reader
+# instead of asked. His note 11-09: "i dont like always that we just put to be decided items at the
+# end of the document etc - fix that systematically". His calls go to him as grill cards the turn the
+# material is made; his answer goes into the section it belongs to; what waits on others sits in the
+# timeline with an owner and a date. House rule.
+PARKED_OPEN = re.compile(r"(?im)^[ \t#*>-]*(?:still to decide|still to be decided|to be decided|open (?:questions|items|calls|decisions)|pending decisions|decisions pending|tbd|questions for (?:you|him|jarrhey))\b[^\n]{0,40}$")
+
+
+def check_parked_open_items(text):
+    """A heading line that parks open calls ('Still to decide', 'Open questions', 'TBD')."""
+    if not HOUSE:
+        return []
+    return [(text[:m.start()].count("\n") + 1, f"[BLOCK] parked open items ('{m.group(0).strip()}') - grill him on each call now (decisions.mjs open), write his answer where the topic lives, put waits in the timeline")
+            for m in PARKED_OPEN.finditer(text)]
+
+
 def check_shape_tells(text):
     return (check_negation_flip(text) + check_mirrored_pair(text)
             + check_fragment_run(text) + check_concede_reveal(text) + check_self_grading(text)
-            + check_paperwork(text) + check_location_pitch(text))
+            + check_paperwork(text) + check_location_pitch(text) + check_parked_open_items(text))

@@ -192,3 +192,68 @@ From Impeccable's slop catalog (impeccable.style/slop, 67 patterns) and Ridd's l
 The same tells in Tailwind and JSX block too (11-02): `from-purple-500` gradients, `font-inter`, Inter from Google Fonts or next/font, `bg-clip-text`, `backdrop-blur` on a see-through white card, `border-l-4`, `blur-3xl` halos, icon tiles sized `h-12 w-12 rounded-xl`, rounded bordered cards nested in each other, three identical feature cards, a cursor glow built from a template string, beige with an italic serif (skipped when the project has a DESIGN-SYSTEM.md, BRAND-SYSTEM.md or DESIGN.md), and launch copy such as "supercharge" or "unleash".
 
 Review only, no hook: a small label above a heading written in normal case, and grey subtext under every heading. In product screens these are form titles and helper text (770 matches in client apps, nearly all real information), so a hook would block good work. On a marketing page or portfolio, cut them during the impeccable critique.
+
+## Unslop pass, 20 fixes (2026-11-08)
+
+From Charles Liu's reel "20 Ways to Unslop AI Designs" (instagram.com/reel/DfcnAJFhAa1). Run these as a last pass on any page, deck or mock before it ships. Where a fix is already a rule above, the line points to it.
+
+1. Delete filler badges. A "Most popular" or "New" pill only stays when it is true and helps a choice (see Less is more).
+2. Drop redundant labels. If the heading says it, the label over it goes (eyebrows, Less is more).
+3. Unitalicize the random word in the headline. One italic word in a sans or serif headline is the AI "tasteful" move. The hook blocks it unless the project has a DESIGN.md that says why.
+4. Mono only where it means code, numbers in a table, or a terminal. Not for labels, tags or decoration.
+5. Use a design system: one set of type sizes, colors, radii and spacing, read from the brand's tokens, never picked per screen.
+6. Show the actual product. A real screen beats an icon grid or a feature card (Stock Illustration Disease, The Feature Grid).
+7. Enlarge the main feature. One thing on the screen is big. Everything else steps down.
+8. Group with spacing. Related items sit close and groups sit apart, with no boxes doing that job (Bento Box Abuse).
+9. Make the headline specific: what it does for whom, in words a competitor could not paste onto their site.
+10. Emphasize the one CTA. One filled button per view, and the rest are quieter.
+11. Add one accent color and use it for the thing to press or notice. One, not a palette.
+12. Keep icons consistent: one set, one stroke weight, one size per context.
+13. Remove embellishments: arrows, sparkles, glows and lines that point at nothing.
+14. Nested radius: inner radius = outer radius minus the padding between them. A 24 px card with 8 px padding holds a 16 px button, not another 24 px one.
+15. Improve text contrast. Check with APCA (the standards repo's `check.mjs`). Body text at Lc 60 or more, and muted text still at Lc 45 or more.
+16. Wrap headlines on purpose: `text-wrap: balance` on headings, no single word left alone on the last line.
+17. Align by eye, not by pixel box. Nudge play icons, quote marks and round shapes so they look centered, even when the box math says otherwise.
+18. Tabular figures for any number that changes or lines up: prices, counters, tables (`font-variant-numeric: tabular-nums`).
+19. Add loading states: a skeleton in the shape of the real content, never a blank area or a lone spinner (Missing States).
+20. Animate useful feedback: the press, the add, the save. Motion confirms an action and never decorates (see the review-animations skill).
+
+## 30 signs a site was vibecoded (2026-11-08)
+
+From Niki Aroca's reel "30 reasons your site looks vibecoded" (instagram.com/reel/DfX3LIIIvub). "Hook" means the write hook blocks it. "Check" means a reviewer looks for it, because a script cannot see it in one file.
+
+Look:
+1. Purple-to-blue gradients (hook).
+2. Three feature cards in a row (hook).
+3. Fake testimonials: a quote with no real name, role, or company. Check.
+4. Sparkle icons everywhere (hook, 2 or more).
+5. "It's not X, it's Y" copy (copy hook).
+6. Gradient headline text (hook).
+7. Glassmorphism everywhere (hook).
+8. Pointless terminal windows, a fake code panel that shows nothing real (hook).
+9. Generic buzzword copy (copy hook).
+10. Untouched shadcn/ui: default radius, gray, and focus ring. Check (Unchanged Component Libraries).
+11. Glowing background orbs (hook).
+12. Emojis in every heading (hook).
+13. Badges above headlines (hook).
+14. Em dashes everywhere (copy hook).
+15. Lucide icons everywhere (hook).
+
+Build:
+16. Empty bento grids (hook).
+17. Generic three-tier pricing: Basic, Pro, and Enterprise with a "Most popular" badge on the middle one. Check.
+18. Everything fades in on scroll (hook, 6 or more).
+19. Cursor-following beams (hook).
+20. Low-contrast dark mode. Check with APCA.
+21. Inconsistent spacing: gaps that come from no scale. Check.
+22. Vague button labels ("Learn more", "Get started", "Submit"): a button says what happens. Check.
+23. No real product demos: a real screen or a recording beats a mockup. Check.
+24. Claims without proof: every number needs a source. Check.
+
+Trust:
+25. Forms asking for too much: only the fields the next step needs. Check.
+26. Forms that don't work by keyboard. Clickable divs and spans with no role or tabIndex are a hook; tab order and focus are a check.
+27. Broken third-party embeds. Check by loading the page.
+28. Placeholder business info: lorem ipsum, 555 numbers, example.com, Acme, John Doe (hook).
+29. No privacy policy. Check on any site that collects data.
+30. No terms and conditions. Check on any site that sells or signs people up.
