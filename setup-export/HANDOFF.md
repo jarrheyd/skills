@@ -123,9 +123,9 @@ What changed since 2.0.0:
 | `skills/write-ledger` | Duplicate-ticket gate described above, plus `backfill.py` to seed it. | `~/.claude/skills/write-ledger` | python3 | none | Run the backfill before turning enforce on. |
 | grill-me | Interview about a plan until every branch is settled. | `~/.claude/skills/grill-me` | nothing | n/a, not copied | Install from Matt Pocock's skills repo. |
 | impeccable (4.0.2) | Frontend design, critique, and audit. | `~/.claude/skills/impeccable` | node for its scripts | n/a, not copied | Install from Paul Bakaus's impeccable repo. |
-| Emil Kowalski set | emil-design-eng, emil-prototype, review-animations, improve-animations, find-animation-opportunities, animation-vocabulary, pick-ui-library. | `~/.claude/skills/<name>` | nothing | n/a, not copied | Install from the author's source. |
-| apple-design | Apple-style motion, gestures, and type for the web. | `~/.claude/skills/apple-design` | nothing | n/a, not copied | Install from its source. |
-| logo-design | Logo work from brief to production files, with a reference library. | `~/.claude/skills/logo-design` | python3 for its scripts | n/a, not copied | Install from its source. |
+| Emil Kowalski set | emil-design-eng, emil-prototype, review-animations, improve-animations, find-animation-opportunities, animation-vocabulary, pick-ui-library. | `~/.claude/skills/<name>` | nothing | copied in `skills/` | Copy each folder. |
+| apple-design | Apple-style motion, gestures, and type for the web. | `~/.claude/skills/apple-design` | nothing | copied in `skills/` | Copy the folder. |
+| logo-design | Logo work from brief to production files, with a reference library. | `~/.claude/skills/logo-design` | python3 for its scripts | copied in `skills/` | Copy the folder. |
 | Figma MCP | `{"type": "http", "url": "https://mcp.figma.com/mcp"}` in `mcpServers` of `~/.claude.json`. | `~/.claude.json` | Figma login | none | She has it already. |
 | Chrome DevTools MCP | `chrome-devtools-mcp --browserUrl http://127.0.0.1:9223` against a Chrome started with a debug port. | `~/.claude.json` | the CLI, Chrome | yes, a Homebrew binary path | Optional. |
 | Local MCP proxies | Each local server runs once under launchd through `mcp-proxy` on a localhost port; chats connect over HTTP. Configs hold tokens, so none are copied. | not shared | uv, mcp-proxy, node | yes | Only if she wants the local servers. |
@@ -137,7 +137,7 @@ What changed since 2.0.0:
 ## Install order
 
 1. Update jarrheyd-skills to the newest version. Settings below call `bash_doc_gate.py`, which only exists from 2.2.2.
-2. Install the third-party skills: grill-me, impeccable, the Emil Kowalski set, apple-design, and logo-design. The skill gate and the global rules both call them.
+2. Copy every folder in `skills/` to `~/.claude/skills/` (the Emil Kowalski set, apple-design, and logo-design are in there), then install grill-me and impeccable. The skill gate and the global rules both call them.
 3. Copy `skills/` here into `~/.claude/skills/`. Run `python3 ~/.claude/skills/write-ledger/test_write_ledger.py`.
 4. Copy `hooks/` here into `~/.claude/hooks/`. Run `python3 ~/.claude/hooks/rm_guard.py --test` and `python3 ~/.claude/hooks/cloud_cost_hook.py --test`.
 5. Copy `statusline-command.sh` to `~/.claude/` and fill in her org names. Needs `jq`.
@@ -160,14 +160,8 @@ What changed since 2.0.0:
 - The design-system skill's `hooks/hooks.json` only runs if that folder is installed as a plugin. As a plain skill it does nothing.
 - Since the 6 Nov deslop split, house rules (American spelling, Title Case headings, named banned words) run only with `$DESLOP_DATA/house-rules.md` or `DESLOP_HOUSE=1`. Without that file she gets the shared checks only.
 
-## Questions for me
+## Left out on purpose
 
-1. The Emil Kowalski skills, apple-design, and logo-design have no source repo recorded on my machine. Which repos should she install them from?
-2. Share a cleaned deslop `house-rules.md`? Without it, her deslop runs only the shared checks.
-3. The skills checkout has local edits to qa-review, retro, and deslop that are not on GitHub. Push them before she updates?
-4. brand-system and marketing are left out because they read the private brand repo and your notes. Want cleaned versions in?
-5. The 12 global agents are left out as personal. Any she should get?
-6. `outputStyle` is "Proactive" but no style file exists on disk. Is it built in, or should the setting be dropped?
-7. Playwright MCP shows in your sessions but no settings file sets it up. Where does it come from?
-8. Recommend `bypassPermissions` and `auto_allow.py` to her, or leave her prompts on?
-9. Her first name is on the repo's leak denylist, so this file says "she" and the column reads "She has it?". Add her name to `.leak-allow`, or keep it out?
+- Deslop house rules, brand-system, marketing, and the global agents: they read Jarrhey's private notes and brands. She gets the shared checks.
+- `bypassPermissions` and `auto_allow.py`: keep her permission prompts on until she is used to the hooks. Turn them on later if the prompts slow her down.
+- `outputStyle` "Proactive" is built into Claude Code. No file is needed.
