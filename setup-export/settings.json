@@ -1,0 +1,229 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "cleanupPeriodDays": 365,
+  "env": {
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "40",
+    "MCP_TIMEOUT": "90000",
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "DESLOP_SKIP_PATHS": "/memory/",
+    "DESLOP_HOOKS": "<ADD YOUR OWN: full path to the jarrheyd-skills plugin's skills/writing/deslop/hooks folder>"
+  },
+  "permissions": {
+    "allow": [
+      "EnterWorktree",
+      "mcp__claude_ai_Gmail__create_draft",
+      "mcp__claude_ai_Gmail__update_draft",
+      "mcp__claude_ai_Google_Drive__create_file",
+      "mcp__claude_ai_Google_Drive__update_file",
+      "mcp__claude_ai_Atlassian__addCommentToJiraIssue",
+      "mcp__claude_ai_Atlassian__createJiraIssue",
+      "mcp__claude_ai_Atlassian__editJiraIssue",
+      "mcp__claude_ai_Atlassian__transitionJiraIssue",
+      "mcp__claude_ai_Atlassian__createIssueLink",
+      "mcp__claude_ai_Atlassian__createConfluencePage",
+      "mcp__claude_ai_Atlassian__updateConfluencePage",
+      "Write(~/.claude/projects/*/memory/**)",
+      "Edit(~/.claude/projects/*/memory/**)"
+    ],
+    "defaultMode": "bypassPermissions"
+  },
+  "model": "opus",
+  "effortLevel": "high",
+  "alwaysThinkingEnabled": true,
+  "outputStyle": "Proactive",
+  "skillOverrides": {
+    "agents-sdk": "off",
+    "cloudflare": "off",
+    "cloudflare-email-service": "off",
+    "cloudflare-one": "off",
+    "cloudflare-one-migrations": "off",
+    "durable-objects": "off",
+    "nextjs-on-cloudflare": "off",
+    "sandbox-next": "off",
+    "sandbox-stable": "off",
+    "sandbox-migrate-to-next": "off",
+    "turnstile-spin": "off",
+    "web-perf": "off",
+    "workers-best-practices": "off",
+    "wrangler": "off",
+    "animation-vocabulary": "off"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/hooks/rm_guard.py"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__(claude-in-chrome|Claude_Browser)__(computer|browser_batch|form_input)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$DESLOP_HOOKS/copy_slop_hook.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__.*__(send_message|send_imessage|discord_send|discord_reply_to_forum|discord_send_webhook_message|discord_create_forum_post|reply|forward|create_draft|update_draft|gmail_draft|gmail_send_email|outlook_send_mail|outlook_create_draft|outlook_create_reply_draft|outlook_create_reply_all_draft|outlook_send_draft|outlook_update_draft|outlook_forward_mail|teams_send_channel_message|teams_reply_channel_message|teams_send_chat_message|jira_add_comment|jira_edit_comment|jira_create_issue|jira_update_issue|addCommentToJiraIssue|createJiraIssue|createConfluenceFooterComment|createConfluenceInlineComment|createConfluencePage|wrike_create_task|wrike_update_task)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$DESLOP_HOOKS/copy_slop_hook.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$DESLOP_HOOKS/bash_doc_gate.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__.*__(createJiraIssue|addCommentToJiraIssue|jira_create_issue|jira_add_comment|wrike_create_task|linear_create_issue|create_issue)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/skills/write-ledger/hooks/ledger_check_hook.py"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__.*__(create_draft|update_draft|reply|forward|send_message|send_email|gmail_draft|gmail_send_email|outlook_send_mail|outlook_create_draft|outlook_create_reply_draft|outlook_create_reply_all_draft|outlook_update_draft|teams_send_chat_message|create_file|update_file)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/hooks/unwrap_links_hook.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/hooks/no_ai_comment_label.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/hooks/skill_gate_hook.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/hooks/cloud_cost_hook.py"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "mcp__.*__(createJiraIssue|addCommentToJiraIssue|jira_create_issue|jira_add_comment|wrike_create_task|linear_create_issue|create_issue)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/skills/write-ledger/hooks/ledger_record_hook.py"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__.*__create_draft",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/hooks/reply_draft_images_hook.py"
+          }
+        ]
+      },
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/hooks/picker_dismissed_hook.py"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/hooks/open_steps_stop_hook.py"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/hooks/auto_allow.py"
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "sh ~/.claude/statusline-command.sh"
+  },
+  "enabledPlugins": {
+    "swift-lsp@claude-plugins-official": true,
+    "cloudflare@cloudflare": true
+  },
+  "extraKnownMarketplaces": {
+    "cloudflare": {
+      "source": {
+        "source": "github",
+        "repo": "cloudflare/skills"
+      }
+    }
+  },
+  "autoMode": {
+    "allow": [
+      "$defaults",
+      "Bash(gcloud functions describe:*)",
+      "Bash(gcloud functions list:*)",
+      "Bash(gh pr view:*)"
+    ],
+    "soft_deny": [
+      "$defaults",
+      "Bash(gcloud functions delete:*)",
+      "Bash(railway down:*)"
+    ],
+    "environment": [
+      "<ADD YOUR OWN: your org, cloud, repos, secrets store, and protected branches, in short lines>"
+    ]
+  },
+  "tui": "fullscreen",
+  "voice": {
+    "enabled": true,
+    "mode": "hold"
+  },
+  "voiceEnabled": true,
+  "theme": "auto",
+  "remoteControlAtStartup": true,
+  "inputNeededNotifEnabled": true,
+  "agentPushNotifEnabled": true,
+  "skipDangerousModePermissionPrompt": true,
+  "skipWorkflowUsageWarning": true
+}

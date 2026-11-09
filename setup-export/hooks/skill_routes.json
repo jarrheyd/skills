@@ -1,0 +1,23 @@
+{
+  "about": "Which skill a write needs before it lands. The skill gate hook blocks the write until the chat has loaded that skill once (Skill tool, a typed /skill, or reading its SKILL.md). Add a route here instead of naming the skill in a prompt. Bypass one run with DISABLE_SKILL_GATE=1.",
+  "routes": [
+    {
+      "skill": "logo-design",
+      "why": "logos, app icons, favicons and brand marks",
+      "path": "(?i)(^|/)[^/]*(logo|wordmark|lockup|favicon|apple-touch|app-?icon|brand-?mark|monogram)[^/]*\\.(svg|png|ico|webp)$|(^|/)(icon|mark)(-\\d+)?\\.svg$"
+    },
+    {
+      "skill": "impeccable",
+      "why": "any interface: pages, screens, components, styles",
+      "path": "(?i)\\.(tsx|jsx|vue|svelte|astro|css|scss|html)$",
+      "skip_path": "(?i)(/node_modules/|/dist/|/build/|/coverage/|\\.test\\.|\\.spec\\.|/tests?/|/__tests__/|/fixtures/)"
+    },
+    {
+      "skill": "apple-design",
+      "why": "motion, gestures, springs, sheets and drag",
+      "content": "(?i)(from ['\"](framer-motion|motion|motion/react|gsap|@react-spring/[a-z]+|lenis)['\"]|ScrollTrigger|setPointerCapture|requestAnimationFrame|@keyframes)",
+      "path": "(?i)\\.(tsx|jsx|ts|js|vue|svelte|css|scss|html)$",
+      "skip_path": "(?i)(/node_modules/|/dist/|/build/|\\.test\\.|\\.spec\\.)"
+    }
+  ]
+}
