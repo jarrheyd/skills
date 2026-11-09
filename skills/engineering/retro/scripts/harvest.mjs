@@ -27,7 +27,9 @@ const DROP_PREFIXES = [
 const VALLEY_MACHINE = /^(From Jarrhey's mission control|Reply with the single word|\[from |From the EA brief|Helper chat "|You take over from|You were moved to|Jarrhey moved you to|Jarrhey says close this chat|Still late after|Due within|LATE:|\/[\w:-]+(\s|$))/;
 // valley wakes, probes and relays sent with `claude --resume <id> "<text>"` carry no origin, so they
 // drop by prefix whatever the origin (retro 10-24: ~100 of 402 moments were these)
-const VALLEY_RESUME = /^(Reply with exactly|Ask me with AskUserQuestion, one question "Probe|keeper pass |InTown loop wake|EVENT from mission control|FYI, the valley handled|FOLLOW UP\. You are|HEARTBEAT|Routine failed, fix it now|Your first start hit|Your sign-in stopped|Delivery check|Continue the Codex chat|Your last turn stopped|From valley:|From handoff watch|From checker:)/;
+// 11-10: wakes switched to "From the valley:" and 20 of 79 moments in one day were these; a relay of
+// his own unread messages ("Jarrhey's message below reached your earlier run") stays, it carries his words.
+const VALLEY_RESUME = /^(Reply with exactly|Ask me with AskUserQuestion, one question "Probe|keeper pass |InTown loop wake|EVENT from mission control|FYI, the valley handled|FOLLOW UP\. You are|HEARTBEAT|Routine failed, fix it now|Your first start hit|Your sign-in stopped|Delivery check|Continue the Codex chat|Your last turn stopped|From (the )?valley: (?!Jarrhey's messages? below)|From handoff watch|From checker:|continue The valley fixed)/;
 const OS_PREFIXES = ['<scheduled-task', '[SCHEDULED TASK', '<automation', '(Re-invocation of', 'Another Claude session sent a message'];
 const STRIP_BLOCKS = [
   /<system-reminder>[\s\S]*?<\/system-reminder>/g,

@@ -78,3 +78,16 @@ test('a continue after an API error is network noise, not a retry', () => {
   ]);
   assert.deepEqual(m.map((x) => x.kind), ['api-retry', 'retry']);
 });
+
+test('valley wakes drop whatever their wording, a relay of his unread words stays', () => {
+  const m = harvestRecords([
+    user('start'), said('ok'),
+    user('From the valley: your turn ended 16 min ago but you still read as working. Re-read your last steps and carry on.'),
+    user('From the valley: The valley sees you idle with your own job open: J1 "x". Pick it up now.'),
+    user('From valley: You ended your turn 21 min ago saying a helper would wake you.'),
+    user('continue The valley fixed what stopped your last turn: the sign-in works again.'),
+    user('From the valley: Jarrhey\'s message below reached your earlier run while it was busy. Act on it now: "deck?"="change the cover"'),
+  ]);
+  assert.equal(m.length, 1);
+  assert.match(m[0].text, /change the cover/);
+});
